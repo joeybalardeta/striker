@@ -1,12 +1,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "game.h"
-
+#include "player.h"
+#include "piece.h"
 
 Game *create_game() {
 	Game *game = malloc(sizeof(Game));
-	game->player_w = 0;
-	game->player_b = 0;
+	game->player_w = USER;
+	game->player_b = USER;
 	
 	game->move = 0;
 	game->castle_kingside_w = 1;
@@ -47,7 +48,11 @@ void set_player_b(Game *game, uint8_t player_b) {
 
 
 void set_default_board(Game *game) {
-
+	// pawns
+	for (uint8_t i = 0; i < 8; i++) {
+		game->board[i + 8] = WHITE | PAWN;
+		game->board[i + 48] = BLACK | PAWN;
+	}
 
 }
 
