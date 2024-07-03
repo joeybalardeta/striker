@@ -4,18 +4,18 @@
 #include <stdint.h>
 
 typedef enum {
-	// first 3 bits
-	NONE = 0,
-	PAWN = 1,
-	KNIGHT = 2,
-	BISHOP = 3,
-	ROOK = 4,
-	QUEEN = 5,
-	KING = 6,
-	
-	// next 2 bits
-	WHITE = 8,
-	BLACK = 16
+    // first 3 bits
+    NONE = 0,
+    PAWN = 1,
+    KNIGHT = 2,
+    BISHOP = 3,
+    ROOK = 4,
+    QUEEN = 5,
+    KING = 6,
+    
+    // next 2 bits
+    WHITE = 8,
+    BLACK = 16
 } Piece;
 
 
