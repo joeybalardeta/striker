@@ -16,8 +16,8 @@ uint16_t get_user_move() {
     to_rank -= 'a';
     to_file -= '1';
 
-    uint8_t from = from_rank * 8 + from_file;
-    uint8_t to = to_rank * 8 + to_file;
+    uint8_t from = from_rank + from_file * 8;
+    uint8_t to = to_rank + to_file * 8;
 
     uint16_t move = from + (to << 8);
     return move;
