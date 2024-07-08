@@ -72,7 +72,7 @@ void execute_option(uint32_t option) {
         case 102: {	        // movelist test
             MoveList *movelist = create_movelist();
             for (int i = 0; i < 10; i++) {
-                add_movelistentry(movelist, create_movelistentry(i));
+                add_move(movelist, i);
             }
             delete_movelist(movelist);
             break;

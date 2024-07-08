@@ -22,6 +22,7 @@ void delete_movelist(MoveList *movelist);
 
 MoveListEntry *get_movelistentry(MoveList *movelist, uint32_t index);
 void add_movelistentry(MoveList *movelist, MoveListEntry *movelistentry);
+void add_move(MoveList *movelist, uint16_t move);
 void remove_movelistentry(MoveList *movelist, uint32_t index);
 void clear_movelist(MoveList *movelist);
 

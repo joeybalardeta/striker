@@ -58,6 +58,11 @@ void add_movelistentry(MoveList *movelist, MoveListEntry *movelistentry) {
 }
 
 
+void add_move(MoveList *movelist, uint16_t move) {
+    add_movelistentry(movelist, create_movelistentry(move));
+}
+
+
 void remove_movelistentry(MoveList *movelist, uint32_t index) {
     if (movelist->length == 0) {
         return;
