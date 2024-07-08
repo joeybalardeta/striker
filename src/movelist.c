@@ -27,7 +27,7 @@ void delete_movelist(MoveList *movelist) {
 MoveListEntry *get_movelistentry(MoveList *movelist, uint32_t index) {
     uint32_t length = movelist->length;
 
-    if (index + 1 >= length) {
+    if (index >= length) {
         return NULL;
     }
 

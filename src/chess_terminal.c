@@ -5,6 +5,7 @@
 #include "game.h"
 #include "io.h"
 #include "ai.h"
+#include "movelist.h"
 
 void chess_terminal() {
     printf("\nInteractive Chess Terminal:\n");
@@ -25,7 +26,7 @@ void chess_terminal() {
 
 void execute_option(uint32_t option) {
     switch(option) {
-        case 1:	{			// user vs user
+        case 1:	{           // user vs user
             Game *game = create_game();
             set_player_w(game, USER);
             set_player_b(game, USER);
@@ -37,34 +38,43 @@ void execute_option(uint32_t option) {
             break;
         
         }
-        case 2:	{			// user vs computer
+        case 2:	{           // user vs computer
             break;
         
         }
-        case 3:	{			// computer vs computer
+        case 3:	{           // computer vs computer
             break;
         }
 
-        case 4:	{			// perft move generation
+        case 4:	{           // perft move generation
             break;
         
         }
 
-        case 5:	{			// perft move generation (with FEN)
+        case 5:	{           // perft move generation (with FEN)
             break;
 
         }
 
-        case 8:	{			// settings
+        case 8:	{           // settings
             break;
 
         }
 
         // extra cases for testing things quickly
-        case 101: {			// move test
+        case 101: {         // move test
             printf("Enter move: ");
             uint16_t move = get_user_move();
             printf("Entered move: %u\n", move);
+            break;
+        }
+        
+        case 102: {	        // movelist test
+            MoveList *movelist = create_movelist();
+            for (int i = 0; i < 10; i++) {
+                add_movelistentry(movelist, create_movelistentry(i));
+            }
+            delete_movelist(movelist);
             break;
         }
         
