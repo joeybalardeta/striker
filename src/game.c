@@ -7,7 +7,7 @@
 #include "io.h"
 
 Game *create_game() {
-    Game *game = malloc(sizeof(Game));
+    Game *game = (Game *) malloc(sizeof(Game));
     game->player_w = USER;
     game->player_b = USER;
     
