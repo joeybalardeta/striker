@@ -67,10 +67,85 @@ uint8_t is_in_check(Game *game, uint8_t player) {
 
 
 uint8_t is_valid_piece_move(Game *game, uint16_t move) {
-    return 1;
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    uint8_t piece = game->board[from];
+
+    if (is_pawn(piece)) {
+        return is_valid_pawn_move(game, move);
+    }
+    else if (is_knight(piece)) {
+        return is_valid_knight_move(game, move);
+    }
+    else if (is_bishop(piece)) {
+        return is_valid_bishop_move(game, move);
+    }
+    else if (is_rook(piece)) {
+        return is_valid_rook_move(game, move);
+    }
+    else if (is_queen(piece)) {
+        // easy hack instead of making a queen move validator
+        return (is_valid_bishop_move(game, move) || is_valid_rook_move(game, move));
+    }
+    // assumes the piece is a king if nothing else matche
+    else { 
+        return is_valid_king_move(game, move);
+    }
 }
 
 
 uint8_t is_move_obstructed(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    uint8_t piece = game->board[from];
+    
+    return 1;
+}
+
+
+// piece move validator functions
+uint8_t is_valid_pawn_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    uint8_t piece = game->board[from];
+    uint8_t en_passant = 0;
+    
+    if (is_white(piece) && (from / 8) == 1) {
+        en_passant = 1;
+    }
+    else if (!is_white(piece) && (from / 8) == 6) {
+        en_passant = 1;
+    }
+
+    if (is_white(piece)) {
+       ; 
+    }
+
+    return 1;
+}
+
+
+uint8_t is_valid_knight_move(Game *game, uint16_t move) {
+    return 1;
+}
+
+
+uint8_t is_valid_bishop_move(Game *game, uint16_t move) {
+    return 1;
+}
+
+
+uint8_t is_valid_rook_move(Game *game, uint16_t move) {
+    return 1;
+}
+
+
+uint8_t is_valid_king_move(Game *game, uint16_t move) {
     return 1;
 }
