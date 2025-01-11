@@ -6,6 +6,7 @@
 #include "io.h"
 #include "ai.h"
 #include "movelist.h"
+#include "rules.h"
 
 void chess_terminal() {
     printf("\nInteractive Chess Terminal:\n");
@@ -122,8 +123,7 @@ uint8_t game_tick(Game *game) {
         print_board(game);
         if (game->player_w == USER) {
             printf("\n");
-            printf("Enter move: ");
-            move = get_user_move();
+            move = get_valid_user_move(game);
         }
         else if (game->player_w == COMPUTER) {
             move = get_computer_move(game);
@@ -133,8 +133,7 @@ uint8_t game_tick(Game *game) {
         print_board_reverse(game);
         if (game->player_b == USER) {
             printf("\n");
-            printf("Enter move: ");
-            move = get_user_move();
+            move = get_valid_user_move(game);
         }
         else if (game->player_b == COMPUTER) {
             move = get_computer_move(game);
@@ -151,4 +150,17 @@ uint8_t game_tick(Game *game) {
     
     // check game state (returns for loop exiting)
     return 0;
+}
+
+uint16_t get_valid_user_move(Game *game) {
+    printf("Enter move: ");
+    uint16_t move = get_user_move();
+
+    while (!is_legal_move(game, move)) {
+        printf("Invalid move!\n");
+        printf("Enter move: ");
+        move = get_user_move();
+    }
+
+    return move;
 }

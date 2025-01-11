@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdint.h>
 #include "rules.h"
 #include "game.h"
@@ -6,37 +7,42 @@
 
 uint8_t is_legal_move(Game *game, uint16_t move) {
     // get the moving player
-    uint8_t active_player = game->move ? PLAYERW : PLAYERB;
+    uint8_t active_player = !game->move ? PLAYERW : PLAYERB;
 
     // deserialize move
     uint8_t from = move & 0xFF;
-    uint8_t to = (move >> 8) & 0xFF;
+    // uint8_t to = (move >> 8) & 0xFF;
 
     // check if piece is on from square
     uint8_t piece = game->board[from];
     if (!is_piece(piece)) {
+        printf("Move invalidated - no piece on from square!\n");
         return 0;
     }
 
-    // check if piece is active player's piece
+    // verify piece is active player's piece
     if (active_player == PLAYERW) {
         if (!is_white(piece)) {
+            printf("Move invalidated - not a white piece!\n");
             return 0;
         }
     }
     else {
         if (is_white(piece)) {
+            printf("Move invalidated - not a black piece!\n");
             return 0;
         }
     }
 
     // check if move is valid for that piece
     if (!is_valid_piece_move(game, move)) {
+        printf("Move invalidated - not a valid piece move!\n");
         return 0;
     }
 
     // check if move goes through pieces or lands on own piece (not allowed!)
-    if (is_move_obstructed(game, move)) {
+    if (!is_move_unobstructed(game, move)) {
+        printf("Move invalidated - move obstructed!\n");
         return 0;
     }
 
@@ -45,6 +51,7 @@ uint8_t is_legal_move(Game *game, uint16_t move) {
     move_piece(clone, move);
     if (is_in_check(clone, active_player)) {
         delete_game(clone);
+        printf("Move invalidated - move places king in check!\n");
         return 0;
     }
     delete_game(clone);
@@ -69,7 +76,7 @@ uint8_t is_in_check(Game *game, uint8_t player) {
 uint8_t is_valid_piece_move(Game *game, uint16_t move) {
     // deserialize move
     uint8_t from = move & 0xFF;
-    uint8_t to = (move >> 8) & 0xFF;
+    // uint8_t to = (move >> 8) & 0xFF;
     
     uint8_t piece = game->board[from];
 
@@ -96,13 +103,64 @@ uint8_t is_valid_piece_move(Game *game, uint16_t move) {
 }
 
 
-uint8_t is_move_obstructed(Game *game, uint16_t move) {
+uint8_t is_move_unobstructed(Game *game, uint16_t move) {
     // deserialize move
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
     
-    uint8_t piece = game->board[from];
-    
+    // checks if the move should even be considered
+    int8_t delta = to - from;
+    uint8_t start_row_idx = from / 8;
+    uint8_t end_row_idx = to / 8;
+    if (!(delta % 7 == 0 || delta % 9 == 0 || delta % 8 == 0 || start_row_idx == end_row_idx)) {
+        return 1;
+    }
+
+    uint8_t start = from;
+    uint8_t end = to;
+
+    if (to < from) {
+        start = to;
+        end = from;
+    }
+
+
+    // up-left and down-right diagonals
+    if (delta % 7 == 0) {
+        for (int i = start + 7; i < end; i += 7) {
+            if (game->board[i] != 0) {
+                return 0;
+            }
+        }
+    }
+    // up-right and down-left diagonals
+    else if (delta % 9 == 0) {
+        for (int i = start + 9; i < end; i += 9) {
+            if (game->board[i] != 0) {
+                return 0;
+            }
+        }
+    }
+    // vertical sliding
+    else if (delta % 8 == 0) {
+        for (int i = start + 8; i < end; i += 8) {
+            if (game->board[i] != 0) {
+                return 0;
+            }
+        }
+
+    }
+    // horizontal sliding
+    else {
+        for (int i = start + 1; i < end; i++) {
+            if (game->board[i] != 0) {
+                return 0;
+            }
+        }
+
+    }
+
+
     return 1;
 }
 
@@ -124,7 +182,15 @@ uint8_t is_valid_pawn_move(Game *game, uint16_t move) {
     }
 
     if (is_white(piece)) {
-       ; 
+        if (!(((to - from) == 8) || ((to - from) == 16 && en_passant))) {
+            return 0;
+        }
+    }
+    else {
+        if (!(((to - from) == -8) || ((to - from) == -16 && en_passant))) {
+            return 0;
+        }
+
     }
 
     return 1;
@@ -132,20 +198,101 @@ uint8_t is_valid_pawn_move(Game *game, uint16_t move) {
 
 
 uint8_t is_valid_knight_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    // account for negatives
+    int8_t delta = to - from;
+    if (delta < 0) {
+        delta = -delta;
+    }
+
+    // possible moves for knight (positive only since negatives eliminated)
+    if (!(delta == 6 || delta == 10 || delta == 15 || delta == 17)) {
+        return 0;
+    }
+
     return 1;
 }
 
 
 uint8_t is_valid_bishop_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+
+    int8_t delta = to - from;
+
+    // don't need to correct negative deltas due to modulo properties
+    if (!(delta % 7 == 0 || delta % 9 == 0)) {
+        return 0;
+    }
+
     return 1;
 }
 
 
 uint8_t is_valid_rook_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    int8_t delta = to - from;
+
+    // don't need to correct negative deltas due to modulo properties
+    if (!(delta % 8 == 0)) {
+        return 0;
+    }
+
+    // account for same row movement
+    uint8_t start_row_idx = from / 8;
+    uint8_t end_row_idx = to / 8;
+    if (!(start_row_idx == end_row_idx)) {
+        return 0;
+    }
+
     return 1;
 }
 
 
+uint8_t is_valid_queen_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    int8_t delta = to - from;
+
+    // don't need to correct negative deltas due to modulo properties
+    if (!(delta % 7 == 0 || delta % 9 == 0 || delta % 8 == 0)) {
+        return 0;
+    }
+    
+    // account for same row movement
+    uint8_t start_row_idx = from / 8;
+    uint8_t end_row_idx = to / 8;
+    if (!(start_row_idx == end_row_idx)) {
+        return 0;
+    }
+
+    return 1;
+    
+}
+
+
 uint8_t is_valid_king_move(Game *game, uint16_t move) {
+    // deserialize move
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    int8_t delta = to - from;
+    if (delta < 0) {
+        delta = -delta;
+    }
+
+    if (!(delta == 1 || delta == 7 || delta == 8 || delta == 9)) {
+        return 0;
+    }
+
     return 1;
 }

@@ -19,6 +19,10 @@ Game *create_game() {
 
     game->en_passant_square = 255;
 
+    for (int i = 0; i < 64; i++) {
+        game->board[i] = 0;
+    }
+
     return game;
 }
 
@@ -93,10 +97,6 @@ void set_default_board(Game *game) {
 void move_piece(Game *game, uint16_t move) {
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
-
-    printf("Move:\n");
-    printf("  From: %u\n", from);
-    printf("  To: %u\n", to);
 
     game->board[to] = game->board[from];
 
