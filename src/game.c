@@ -4,6 +4,7 @@
 #include "game.h"
 #include "player.h"
 #include "piece.h"
+#include "move.h"
 #include "io.h"
 
 Game *create_game() {
@@ -17,10 +18,11 @@ Game *create_game() {
     game->castle_kingside_b = 1;
     game->castle_queenside_b = 1;
 
-    game->en_passant_square = 255;
+    game->w_en_passant_square = 0xFF;
+    game->b_en_passant_square = 0xFF;
 
     for (int i = 0; i < 64; i++) {
-        game->board[i] = 0;
+        game->board[i] = NONE;
     }
 
     return game;
@@ -37,7 +39,8 @@ Game *clone_game(Game *game) {
     clone->castle_kingside_b = game->castle_kingside_b;
     clone->castle_queenside_b = game->castle_queenside_b;
 
-    clone->en_passant_square = game->en_passant_square;
+    clone->w_en_passant_square = game->w_en_passant_square;
+    clone->b_en_passant_square = game->b_en_passant_square;
 
     return clone;
 }	
@@ -94,13 +97,50 @@ void set_default_board(Game *game) {
 }
 
 
-void move_piece(Game *game, uint16_t move) {
+void move_piece(Game *game, uint32_t move) {
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
+    
+    // en passant targeting
+    if ((game->board[from] & PAWN)) {
+        int8_t delta = to - from;
+        if (move & MOVE_WHITE_MASK) {
+            if (delta == 16) {
+                game->b_en_passant_square = from + 8;
+            }
+            else {
+                game->b_en_passant_square = 0xFF;
+            }
+        }
+        else {
+            if (delta == -16) {
+                game->w_en_passant_square = from - 8;
+            }
+            else {
+                game->w_en_passant_square = 0xFF;
+            }
+        }
+    }
 
+    // en passant attacking
+    if ((game->board[from] & PAWN)) {
+        if (move & MOVE_WHITE_MASK) {
+            if (game->w_en_passant_square == to) {
+                game->board[to - 8] = NONE;
+            }
+        }
+        else {
+            if (game->b_en_passant_square == to) {
+                game->board[to + 8] = NONE;
+            }
+        }
+    }
+
+
+    // end changes
     game->board[to] = game->board[from];
 
-    game->board[from] = 0x00;
+    game->board[from] = NONE;
 }
 
 

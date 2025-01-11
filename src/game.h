@@ -29,7 +29,10 @@ typedef struct {
     uint8_t castle_queenside_b : 1;
     uint8_t none : 3;					// extra 3 bit padding to make a full byte	
 
-    uint8_t en_passant_square;			// if larger than 63, invalid, if <= 63, valid
+    uint8_t w_en_passant_square;		// en passant attack square for white (changed on black move)
+                                        // if larger than 63, invalid, if <= 63, valid
+    uint8_t b_en_passant_square;		// en passant attack square for black (changed on white move)
+                                        // if larger than 63, invalid, if <= 63, valid
 } Game;
 
 
@@ -40,7 +43,7 @@ void change_turn(Game *game);
 void set_player_w(Game *game, uint8_t player_w);
 void set_player_b(Game *game, uint8_t player_b);
 void set_default_board(Game *game);
-void move_piece(Game *game, uint16_t move);
+void move_piece(Game *game, uint32_t move);
 void print_board(Game *game);
 void print_board_reverse(Game *game);
 

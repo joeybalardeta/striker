@@ -7,6 +7,7 @@
 #include "ai.h"
 #include "movelist.h"
 #include "rules.h"
+#include "move.h"
 
 void chess_terminal() {
     printf("\nInteractive Chess Terminal:\n");
@@ -118,7 +119,7 @@ void game_loop(Game *game) {
 uint8_t game_tick(Game *game) {
     printf("\n");
     // get move
-    uint16_t move = 0;
+    uint32_t move = 0;
     if (!game->move) {
         print_board(game);
         if (game->player_w == USER) {
@@ -152,15 +153,36 @@ uint8_t game_tick(Game *game) {
     return 0;
 }
 
-uint16_t get_valid_user_move(Game *game) {
+uint32_t get_valid_user_move(Game *game) {
     printf("Enter move: ");
-    uint16_t move = get_user_move();
+    uint32_t move = (uint32_t) get_user_move();
 
     while (!is_legal_move(game, move)) {
         printf("Invalid move!\n");
         printf("Enter move: ");
-        move = get_user_move();
+        move = (uint32_t) get_user_move();
+    }
+    
+    // post move flag adding
+    if (!game->move) {
+        move |= MOVE_WHITE_MASK;
+    }
+    else {
+        move |= MOVE_BLACK_MASK;
     }
 
+    // printf("Move: 0x%x\n", move);
     return move;
+}
+
+
+void dump_game_info(Game *game) {
+    printf("GAME INFO\n");
+    printf("    move: %d\n", game->move);
+    printf("    castle_kingside_w:   %d\n", game->castle_kingside_w);
+    printf("    castle_queenside_w:  %d\n", game->castle_queenside_w);
+    printf("    castle_kingside_b:   %d\n", game->castle_kingside_b);
+    printf("    castle_queenside_b:  %d\n", game->castle_queenside_b);
+    printf("    w_en_passant_square: %d\n", game->w_en_passant_square);
+    printf("    b_en_passant_square: %d\n", game->b_en_passant_square);
 }

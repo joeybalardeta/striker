@@ -12,6 +12,7 @@ void print_options();
 
 void game_loop(Game *game);
 uint8_t game_tick(Game *game);
-uint16_t get_valid_user_move(Game *game);
+uint32_t get_valid_user_move(Game *game);
+void dump_game_info(Game *game);
 
 #endif
