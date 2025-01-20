@@ -8,12 +8,15 @@ A custom chess engine, written in C. A rewrite of frostbyte focused on simplicit
  - No API's for AI move making
 
 ## Current Features
+ - Player vs. Player
+ - Player vs. Computer
+ - Computer vs. Computer
 
 ## Future Planned Features
-
+ - GUI (potentially)
 
 ## Project Info
- - Developed in MacOS Sonoma
+ - Developed in MacOS Sonoma and WSL Ubuntu
  - Compiled with gcc
+ - Debugged and validated with valgrind
  - Compatibile with any OS (gcc and make required for compilation)
-
