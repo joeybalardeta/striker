@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "movelist.h"
+#include "utils.h"
 
 // movelist functions
 MoveList *create_movelist() {
@@ -58,7 +60,7 @@ void add_movelistentry(MoveList *movelist, MoveListEntry *movelistentry) {
 }
 
 
-void add_move(MoveList *movelist, uint16_t move) {
+void add_move(MoveList *movelist, uint32_t move) {
     add_movelistentry(movelist, create_movelistentry(move));
 }
 
@@ -91,7 +93,7 @@ void clear_movelist(MoveList *movelist) {
 }
 
 // movelistentry functions
-MoveListEntry *create_movelistentry(uint16_t move) {
+MoveListEntry *create_movelistentry(uint32_t move) {
     MoveListEntry *movelistentry = (MoveListEntry *) malloc(sizeof(MoveListEntry));
 
     movelistentry->move = move;
@@ -106,4 +108,16 @@ void delete_movelistentry(MoveListEntry *movelistentry) {
         return;
     }
     free(movelistentry);
+}
+
+
+void print_movelist(MoveList *movelist) {
+    printf("MoveList (@ %p)\n", movelist);
+    MoveListEntry *mle = movelist->first;
+    for (int i = 0; i < movelist->length; i++) {
+        printf("    ");
+        print_move(mle->move);
+        printf("\n");
+        mle = mle->next;
+    }
 }

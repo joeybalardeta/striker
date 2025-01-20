@@ -1,48 +1,60 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "rules.h"
+#include "movelist.h"
 #include "game.h"
 #include "player.h"
 #include "piece.h"
+#include "utils.h"
+
+// debug define macros (enables compilation of printf statements)
+// #define DEBUG_CHECK
 
 uint8_t is_legal_move(Game *game, uint32_t move) {
     // get the moving player
     uint8_t active_player = !game->move ? PLAYERW : PLAYERB;
+    uint8_t active_color = !game->move ? WHITE : BLACK;
 
     // deserialize move
     uint8_t from = move & 0xFF;
-    // uint8_t to = (move >> 8) & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
 
     // check if piece is on from square
     uint8_t piece = game->board[from];
     if (!is_piece(piece)) {
-        printf("Move invalidated - no piece on from square!\n");
+        // printf("Move invalidated - no piece on from square!\n");
         return 0;
     }
 
     // verify piece is active player's piece
     if (active_player == PLAYERW) {
         if (!is_white(piece)) {
-            printf("Move invalidated - not a white piece!\n");
+            // printf("Move invalidated - not a white piece!\n");
             return 0;
         }
     }
     else {
         if (is_white(piece)) {
-            printf("Move invalidated - not a black piece!\n");
+            // printf("Move invalidated - not a black piece!\n");
             return 0;
         }
     }
 
-    // check if move is valid for that piece
-    if (!is_valid_piece_move(game, move)) {
-        printf("Move invalidated - not a valid piece move!\n");
+    // check if move lands on own piece (not allowed!)
+    if (game->board[to] & active_color) {
+        // printf("Move invalidated - move lands on own piece!\n");
         return 0;
     }
 
-    // check if move goes through pieces or lands on own piece (not allowed!)
+    // check if move is valid for that piece
+    if (!is_valid_piece_move(game, move)) {
+        // printf("Move invalidated - not a valid piece move!\n");
+        return 0;
+    }
+
+    // check if move goes through pieces (not allowed!)
     if (!is_move_unobstructed(game, move)) {
-        printf("Move invalidated - move obstructed!\n");
+        // printf("Move invalidated - move obstructed!\n");
         return 0;
     }
 
@@ -51,7 +63,7 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
     move_piece(clone, move);
     if (is_in_check(clone, active_player)) {
         delete_game(clone);
-        printf("Move invalidated - move places king in check!\n");
+        // printf("Move invalidated - move places king in check!\n");
         return 0;
     }
     delete_game(clone);
@@ -62,8 +74,11 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
 
 
 uint8_t is_in_check(Game *game, uint8_t player) {
+    uint32_t attacking_color;
+
     uint8_t king_idx;
     if (player == PLAYERW) {
+        attacking_color = BLACK;
         for (int i = 0; i < 64; i++) {
             if (game->board[i] == (KING | WHITE)) {
                 king_idx = i;
@@ -72,6 +87,7 @@ uint8_t is_in_check(Game *game, uint8_t player) {
         }
     }
     else {
+        attacking_color = WHITE;
         for (int i = 0; i < 64; i++) {
             if (game->board[i] == (KING | BLACK)) {
                 king_idx = i;
@@ -80,21 +96,27 @@ uint8_t is_in_check(Game *game, uint8_t player) {
         }
     }
 
-    if (player == PLAYERW) {
-        for (int i = 0; i < 64; i++) {
-            if (game->board[i] & BLACK) {
-                if (is_attacking(game, king_idx, i)) {
-                    return 1;
-                }
-            }
-        }
-    }
-    else {
-        for (int i = 0; i < 64; i++) {
-            if (game->board[i] & WHITE) {
-                if (is_attacking(game, king_idx, i)) {
-                    return 1;
-                }
+    for (int i = 0; i < 64; i++) {
+        #ifdef DEBUG_CHECK
+        printf("Viewing square ");
+        print_square(i);
+        printf(" (%d | %p)  |  ", i, &game->board[i]);
+        printf("Piece value: %u\n", game->board[i]);
+        #endif
+        if (game->board[i] & attacking_color) {
+            #ifdef DEBUG_CHECK
+            printf(attacking_color == WHITE ? "White" : "Black");
+            printf(" piece on ");
+            print_square(i);
+            printf("\n");
+            #endif
+            if (is_attacking(game, king_idx, i)) {
+                #ifdef DEBUG_CHECK
+                printf("    is attacking ");
+                printf(attacking_color == WHITE ? "Black" : "White");
+                printf(" King\n");
+                #endif
+                return 1;
             }
         }
     }
@@ -126,7 +148,7 @@ uint8_t is_valid_piece_move(Game *game, uint32_t move) {
         // easy hack instead of making a queen move validator
         return (is_valid_bishop_move(game, move) || is_valid_rook_move(game, move));
     }
-    // assumes the piece is a king if nothing else matche
+    // assumes the piece is a king if nothing else matches
     else { 
         return is_valid_king_move(game, move);
     }
@@ -137,8 +159,8 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
     // deserialize move
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
-    
-    // checks if the move should even be considered
+
+    // checks if the move can even be obstructed (basically if the move is a non-knight move)
     int8_t delta = to - from;
     uint8_t start_row_idx = from / 8;
     uint8_t end_row_idx = to / 8;
@@ -155,7 +177,7 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
     }
 
     // pawn specific checks
-    if ((game->board[from] & PAWN) == PAWN) {
+    if (is_pawn(game->board[from])) {
         if (game->board[to] != NONE) {
             return 0;
         }
@@ -195,7 +217,6 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
 
     }
 
-
     return 1;
 }
 
@@ -204,10 +225,12 @@ uint8_t is_attacking(Game *game, uint8_t target, uint8_t attacker) {
     uint32_t speculative_move = attacker + (target << 8);
 
     if (!is_valid_piece_move(game, speculative_move)) {
+        // printf("Piece is not attacking, invalid piece move.\n");
         return 0;
     }
 
     if (!is_move_unobstructed(game, speculative_move)) {
+        // printf("Piece is not attacking, obstructed move.\n");
         return 0;
     }
 
@@ -348,9 +371,33 @@ uint8_t is_valid_king_move(Game *game, uint32_t move) {
         delta = -delta;
     }
 
-    if (!(delta == 1 || delta == 7 || delta == 8 || delta == 9)) {
+    uint8_t start_row = from / 8;
+    uint8_t end_row = to / 8;
+
+    if (!((delta == 1 && start_row == end_row) || delta == 7 || delta == 8 || delta == 9)) {
         return 0;
     }
 
     return 1;
+}
+
+
+MoveList *get_possible_moves(Game *game, uint8_t player) {
+    MoveList *possible_moves = create_movelist();
+
+    uint32_t color = player == PLAYERW ? WHITE : BLACK;
+
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        if (game->board[i] & color) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                uint32_t move = i + (j << 8);
+                uint8_t legal = is_legal_move(game, move);
+                if (legal) {
+                    add_move(possible_moves, move);
+                }
+            }
+        }
+    }
+
+    return possible_moves;
 }

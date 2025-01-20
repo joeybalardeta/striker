@@ -3,11 +3,13 @@
 #include "chess_terminal.h"
 #include "player.h"
 #include "game.h"
+#include "piece.h"
 #include "io.h"
 #include "ai.h"
 #include "movelist.h"
 #include "rules.h"
 #include "move.h"
+#include "utils.h"
 
 void chess_terminal() {
     printf("\nInteractive Chess Terminal:\n");
@@ -41,10 +43,26 @@ void execute_option(uint32_t option) {
         
         }
         case 2:	{           // user vs computer
+            Game *game = create_game();
+            set_player_w(game, USER);
+            set_player_b(game, COMPUTER);
+            set_default_board(game);
+
+            game_loop(game);
+            
+            delete_game(game);
             break;
         
         }
         case 3:	{           // computer vs computer
+            Game *game = create_game();
+            set_player_w(game, COMPUTER);
+            set_player_b(game, COMPUTER);
+            set_default_board(game);
+
+            game_loop(game);
+            
+            delete_game(game);
             break;
         }
 
@@ -54,6 +72,10 @@ void execute_option(uint32_t option) {
         }
 
         case 5:	{           // perft move generation (with FEN)
+            Game *game = load_fen_game("./fen/move_generation_fen.txt");
+            print_board(game);
+            print_possible_moves(game);
+            delete_game(game);
             break;
 
         }
@@ -77,6 +99,23 @@ void execute_option(uint32_t option) {
                 add_move(movelist, i);
             }
             delete_movelist(movelist);
+            break;
+        }
+
+        case 103: {         // piece values test
+            Game *game = create_game();
+            set_player_w(game, USER);
+            set_player_b(game, USER);
+            set_default_board(game);
+
+            printf("Piece values\n");
+            printf("    a1: %u\n", game->board[0]);
+            printf("    a8: %u\n", game->board[7]);
+            printf("    b2: %u\n", game->board[9]);
+            printf("    b5: %u\n", game->board[12]);
+            printf("    b7: %u\n", game->board[14]);
+
+            delete_game(game);
             break;
         }
         
@@ -117,7 +156,6 @@ void game_loop(Game *game) {
 
 
 uint8_t game_tick(Game *game) {
-    printf("\n");
     // get move
     uint32_t move = 0;
     if (!game->move) {
@@ -127,7 +165,7 @@ uint8_t game_tick(Game *game) {
             move = get_valid_user_move(game);
         }
         else if (game->player_w == COMPUTER) {
-            move = get_computer_move(game);
+            move = get_computer_move(game, PLAYERW);
         }
     }
     else  {
@@ -137,18 +175,29 @@ uint8_t game_tick(Game *game) {
             move = get_valid_user_move(game);
         }
         else if (game->player_b == COMPUTER) {
-            move = get_computer_move(game);
+            move = get_computer_move(game, PLAYERB);
         }
     }
 
     printf("\n");
-    
+
     // make move
     move_piece(game, move);
 
     // set up for next iteration
     change_turn(game);
     
+    uint8_t kings = 0;
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        if (is_king(game->board[i])) {
+            kings++;
+        }
+    }
+
+    if (kings != 2) {
+        return 1;
+    }
+
     // check game state (returns for loop exiting)
     return 0;
 }

@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+
+#define PIECE_MASK(value) (value & 0x7)
+
 typedef enum {
     // first 3 bits
     NONE = 0,

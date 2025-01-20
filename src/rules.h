@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "game.h"
+#include "movelist.h"
 
 uint8_t is_legal_move(Game *game, uint32_t move);
 
@@ -21,5 +22,7 @@ uint8_t is_valid_bishop_move(Game *game, uint32_t move);
 uint8_t is_valid_rook_move(Game *game, uint32_t move);
 uint8_t is_valid_queen_move(Game *game, uint32_t move);
 uint8_t is_valid_king_move(Game *game, uint32_t move);
+
+MoveList *get_possible_moves(Game *game, uint8_t player);
 
 #endif

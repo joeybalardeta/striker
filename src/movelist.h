@@ -13,7 +13,7 @@ struct _MoveList {
 
 struct _MoveListEntry {
     MoveListEntry *next;
-    uint16_t move;
+    uint32_t move;
 };
 
 // movelist functions
@@ -22,13 +22,16 @@ void delete_movelist(MoveList *movelist);
 
 MoveListEntry *get_movelistentry(MoveList *movelist, uint32_t index);
 void add_movelistentry(MoveList *movelist, MoveListEntry *movelistentry);
-void add_move(MoveList *movelist, uint16_t move);
+void add_move(MoveList *movelist, uint32_t move);
 void remove_movelistentry(MoveList *movelist, uint32_t index);
 void clear_movelist(MoveList *movelist);
 
 // movelistentry functions
-MoveListEntry *create_movelistentry(uint16_t move);
+MoveListEntry *create_movelistentry(uint32_t move);
 void delete_movelistentry(MoveListEntry *movelistentry);
 
+
+// utils functions
+void print_movelist(MoveList *movelist);
 
 #endif

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include "io.h"
 #include "utils.h"
@@ -29,3 +30,19 @@ uint32_t get_user_option() {
     scanf("%u", &input);
     return input;
 }
+
+
+uint8_t load_fen(const char *filepath, char *buffer) {
+    FILE *fen_file = fopen(filepath, "r");
+
+    if (fen_file == NULL) {
+        printf("FEN file at '%s' not found!\n", filepath);
+        return 1;
+    }
+
+    fgets(buffer, 256, fen_file);
+    fclose(fen_file);
+
+    return 0;
+}
+

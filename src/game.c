@@ -6,13 +6,17 @@
 #include "piece.h"
 #include "move.h"
 #include "io.h"
+#include "utils.h"
+
+// debug define macros (enables compilation of printf statements)
+// #define DEBUG_PTRS
 
 Game *create_game() {
     Game *game = (Game *) malloc(sizeof(Game));
     game->player_w = USER;
     game->player_b = USER;
-    
     game->move = 0;
+    
     game->castle_kingside_w = 1;
     game->castle_queenside_w = 1;
     game->castle_kingside_b = 1;
@@ -34,13 +38,18 @@ Game *clone_game(Game *game) {
     clone->player_w = game->player_w;
     clone->player_b = game->player_b;
     clone->move = game->move;
+    
     clone->castle_kingside_w = game->castle_kingside_w;
     clone->castle_queenside_w = game->castle_queenside_w;
     clone->castle_kingside_b = game->castle_kingside_b;
     clone->castle_queenside_b = game->castle_queenside_b;
-
+    
     clone->w_en_passant_square = game->w_en_passant_square;
     clone->b_en_passant_square = game->b_en_passant_square;
+
+    for (int i = 0; i < 64; i++) {
+        clone->board[i] = game->board[i];
+    }
 
     return clone;
 }	
@@ -67,6 +76,16 @@ void set_player_w(Game *game, uint8_t player_w) {
 
 void set_player_b(Game *game, uint8_t player_b) {
     game->player_b = player_b;
+}
+
+
+void print_all_square_values(Game *game) {
+    printf("Square values\n");
+    for (int i = 0; i < 64; i++) {
+        print_square(i);
+        printf(": %u\n", game->board[i]);
+    }
+    printf("\n");
 }
 
 
@@ -102,7 +121,7 @@ void move_piece(Game *game, uint32_t move) {
     uint8_t to = (move >> 8) & 0xFF;
     
     // en passant targeting
-    if ((game->board[from] & PAWN)) {
+    if (is_pawn(game->board[from])) {
         int8_t delta = to - from;
         if (move & MOVE_WHITE_MASK) {
             if (delta == 16) {
@@ -123,7 +142,7 @@ void move_piece(Game *game, uint32_t move) {
     }
 
     // en passant attacking
-    if ((game->board[from] & PAWN)) {
+    if (is_pawn(game->board[from])) {
         if (move & MOVE_WHITE_MASK) {
             if (game->w_en_passant_square == to) {
                 game->board[to - 8] = NONE;
@@ -145,6 +164,9 @@ void move_piece(Game *game, uint32_t move) {
 
 
 void print_board(Game *game) {
+    #ifdef DEBUG_PTRS
+    printf("Board (@ %p)\n\n", game->board);
+    #endif
     for (int i = 7; i >= 0; i--) {
         printf("  +----+----+----+----+----+----+----+----+\n");
         printf("%d |", i + 1);
@@ -179,4 +201,168 @@ void print_board_reverse(Game *game) {
     }
     printf("  +----+----+----+----+----+----+----+----+\n");
     printf("    H    G    F    E    D    C    B    A\n");
+}
+
+
+Game *load_fen_game(const char *filepath) {
+    char buffer[256] = {0};
+
+    load_fen(filepath, buffer);
+
+    Game *game = create_game();
+
+    uint8_t square = 56;
+    uint8_t rank = 7;
+    uint16_t index = 0;
+
+    while (buffer[index] != ' ') {
+        switch (buffer[index]) {
+            case '1' ... '8':
+                square += (buffer[index] - '0');
+                break;
+
+            case '/':
+                rank -= 1;
+                square = rank * 8;
+
+                break;
+            
+            case 'P':
+                game->board[square] = WHITE | PAWN;
+                square += 1;
+                break;
+
+            case 'N':
+                game->board[square] = WHITE | KNIGHT;
+                square += 1;
+                break;
+            
+            case 'B':
+                game->board[square] = WHITE | BISHOP;
+                square += 1;
+                break;
+            
+            case 'R':
+                game->board[square] = WHITE | ROOK;
+                square += 1;
+                break;
+            
+            case 'Q':
+                game->board[square] = WHITE | QUEEN;
+                square += 1;
+                break;
+            
+            case 'K':
+                game->board[square] = WHITE | KING;
+                square += 1;
+                break;
+
+            case 'p':
+                game->board[square] = BLACK | PAWN;
+                square += 1;
+                break;
+
+            case 'n':
+                game->board[square] = BLACK | KNIGHT;
+                square += 1;
+                break;
+            
+            case 'b':
+                game->board[square] = BLACK | BISHOP;
+                square += 1;
+                break;
+            
+            case 'r':
+                game->board[square] = BLACK | ROOK;
+                square += 1;
+                break;
+            
+            case 'q':
+                game->board[square] = BLACK | QUEEN;
+                square += 1;
+                break;
+            
+            case 'k':
+                game->board[square] = BLACK | KING;
+                square += 1;
+                break;
+            
+            default:
+                break;
+        }
+        index++;
+    }
+
+    uint8_t space_count = 0;
+
+    game->castle_kingside_w = 0;
+    game->castle_queenside_w = 0;
+    game->castle_kingside_b = 0;
+    game->castle_queenside_b = 0;
+
+
+    while (space_count > 3) {
+        switch (buffer[index]) {
+            case 'w':
+                game->move = 0;
+                break;
+            
+            case 'b':
+                game->move = 1;
+                break;
+            
+            case 'K':
+                game->castle_kingside_w = 1;
+                break;
+            
+            case 'Q':
+                game->castle_queenside_w = 1;
+                break;
+            
+            case 'k':
+                game->castle_kingside_b = 1;
+                break;
+            
+            case 'q':
+                game->castle_queenside_b = 1;
+                break;
+
+            case ' ':
+                space_count++;
+                break;
+
+            default:
+                break;
+        }
+        index++;
+    }
+
+    uint8_t en_passant_file = buffer[index];
+    index++;
+    uint8_t en_passant_rank = buffer[index];
+
+    if (en_passant_file != '-') {
+        en_passant_file -= 'a';
+        en_passant_file -= '1';
+
+        uint8_t en_passant_target_square = (en_passant_file * 8) + en_passant_rank;
+
+        if (!game->move) {
+            game->b_en_passant_square = en_passant_target_square;
+        }
+        else {
+            game->w_en_passant_square = en_passant_target_square;
+        }
+        index++;
+    }
+
+    index++;
+
+
+    uint16_t half_moves_count = buffer[index];
+    index++;
+    uint16_t full_moves_count = buffer[index];
+
+    return game;
+
 }
