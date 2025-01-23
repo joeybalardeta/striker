@@ -1,2 +1,0 @@
-Notes:
- - Need to rewrite move validation for specific pieces, pieces can teleport horizontally across the board (ex. -1 square = a8 -> h7)
