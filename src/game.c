@@ -155,11 +155,104 @@ void move_piece(Game *game, uint32_t move) {
         }
     }
 
+    // castling moves
+    if (is_king(game->board[from]) & MOVE_KSC_FLAG_MASK) {
+        game->board[from + 1] = game->board[from + 3];
+        game->board[from + 3] = NONE;
+    }
+    else if (is_king(game->board[from]) & MOVE_QSC_FLAG_MASK) {
+        game->board[from - 1] = game->board[from - 4];
+        game->board[from - 4] = NONE;
+    }
+
 
     // end changes
     game->board[to] = game->board[from];
 
     game->board[from] = NONE;
+}
+
+
+void modify_castling_rights(Game *game, uint32_t move) {
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+    
+    uint8_t from_piece = game->board[from];
+    
+    if (game->castle_kingside_w == 0
+        && game->castle_queenside_w == 0
+        && game->castle_kingside_b == 0
+        && game->castle_queenside_b == 0) {
+        return;
+    }
+
+    // castling
+    if (move & MOVE_KSC_FLAG_MASK) {
+        if (move & MOVE_WHITE_MASK) {
+            game->castle_kingside_w = 0;
+        }
+        else {
+            game->castle_kingside_b = 0;
+        }
+        return;
+    }
+    if ((move & MOVE_QSC_FLAG_MASK)) {
+        if (move & MOVE_WHITE_MASK) {
+            game->castle_queenside_w = 0;
+        }
+        else {
+            game->castle_queenside_b = 0;
+        }
+        return;
+    }
+
+    // king move
+    if ((move & MOVE_WHITE_MASK) && is_king(from_piece)) {
+        game->castle_kingside_w = 0;
+        game->castle_queenside_w = 0;
+        return;
+    }
+    else if ((move & MOVE_BLACK_MASK) && is_king(from_piece)) {
+        game->castle_kingside_b = 0;
+        game->castle_queenside_b = 0;
+        return;
+    }
+
+    // rook move
+    if (is_rook(from_piece)) {
+        if (move & MOVE_WHITE_MASK) {
+            if (from == 7) {
+                game->castle_kingside_w = 0;
+            }
+            else if (from == 0) {
+                game->castle_queenside_w = 0;
+            }
+            return;
+        }
+        if (move & MOVE_BLACK_MASK) {
+            if (from == 63) {
+                game->castle_kingside_b = 0;
+            }
+            else if (from == 56) {
+                game->castle_queenside_b = 0;
+            }
+            return;
+        }
+    }
+    
+    // rook capture moves (or they aren't there, and castling is already disabled):w
+    if (to == 7) {
+        game->castle_kingside_w = 0;
+    }
+    else if (to == 0) {
+        game->castle_queenside_w = 0;
+    }
+    else if (to == 63) {
+        game->castle_kingside_b = 0;
+    }
+    else if (to == 56) {
+        game->castle_queenside_b = 0;
+    }
 }
 
 
@@ -301,7 +394,7 @@ Game *load_fen_game(const char *filepath) {
     game->castle_queenside_b = 0;
 
 
-    while (space_count > 3) {
+    while (space_count < 3) {
         switch (buffer[index]) {
             case 'w':
                 game->move = 0;

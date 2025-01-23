@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "rules.h"
+#include "move.h"
 #include "movelist.h"
 #include "game.h"
 #include "player.h"
@@ -9,6 +10,8 @@
 
 // debug define macros (enables compilation of printf statements)
 // #define DEBUG_CHECK
+// #define DEBUG_MOVE_INVALIDATION
+
 
 uint8_t is_legal_move(Game *game, uint32_t move) {
     // get the moving player
@@ -22,39 +25,51 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
     // check if piece is on from square
     uint8_t piece = game->board[from];
     if (!is_piece(piece)) {
-        // printf("Move invalidated - no piece on from square!\n");
+        #ifdef DEBUG_MOVE_INVALIDATION
+        printf("Move invalidated - no piece on from square!\n");
+        #endif
         return 0;
     }
 
     // verify piece is active player's piece
     if (active_player == PLAYERW) {
         if (!is_white(piece)) {
-            // printf("Move invalidated - not a white piece!\n");
+            #ifdef DEBUG_MOVE_INVALIDATION
+            printf("Move invalidated - not a white piece!\n");
+            #endif
             return 0;
         }
     }
     else {
         if (is_white(piece)) {
-            // printf("Move invalidated - not a black piece!\n");
+            #ifdef DEBUG_MOVE_INVALIDATION
+            printf("Move invalidated - not a black piece!\n");
+            #endif
             return 0;
         }
     }
 
     // check if move lands on own piece (not allowed!)
     if (game->board[to] & active_color) {
-        // printf("Move invalidated - move lands on own piece!\n");
+        #ifdef DEBUG_MOVE_INVALIDATION
+        printf("Move invalidated - move lands on own piece!\n");
+        #endif
         return 0;
     }
 
     // check if move is valid for that piece
     if (!is_valid_piece_move(game, move)) {
-        // printf("Move invalidated - not a valid piece move!\n");
+        #ifdef DEBUG_MOVE_INVALIDATION
+        printf("Move invalidated - not a valid piece move!\n");
+        #endif
         return 0;
     }
 
     // check if move goes through pieces (not allowed!)
     if (!is_move_unobstructed(game, move)) {
-        // printf("Move invalidated - move obstructed!\n");
+        #ifdef DEBUG_MOVE_INVALIDATION
+        printf("Move invalidated - move obstructed!\n");
+        #endif
         return 0;
     }
 
@@ -63,7 +78,9 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
     move_piece(clone, move);
     if (is_in_check(clone, active_player)) {
         delete_game(clone);
-        // printf("Move invalidated - move places king in check!\n");
+        #ifdef DEBUG_MOVE_INVALIDATION
+        printf("Move invalidated - move places king in check!\n");
+        #endif
         return 0;
     }
     delete_game(clone);
@@ -110,7 +127,7 @@ uint8_t is_in_check(Game *game, uint8_t player) {
             print_square(i);
             printf("\n");
             #endif
-            if (is_attacking(game, king_idx, i)) {
+            if (is_piece_attacking(game, i, king_idx)) {
                 #ifdef DEBUG_CHECK
                 printf("    is attacking ");
                 printf(attacking_color == WHITE ? "Black" : "White");
@@ -177,7 +194,7 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
     }
 
     // pawn specific checks
-    if (is_pawn(game->board[from])) {
+    if (is_pawn(game->board[from]) && (delta == 8 || delta == 16)) {
         if (game->board[to] != NONE) {
             return 0;
         }
@@ -221,7 +238,12 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
 }
 
 
-uint8_t is_attacking(Game *game, uint8_t target, uint8_t attacker) {
+// checks if a piece (on 'attacker' square) is attacking a square (target)
+uint8_t is_piece_attacking(Game *game, uint8_t attacker, uint8_t target) {
+    if (attacker == target) {
+        return 0;
+    }
+
     uint32_t speculative_move = attacker + (target << 8);
 
     if (!is_valid_piece_move(game, speculative_move)) {
@@ -235,6 +257,21 @@ uint8_t is_attacking(Game *game, uint8_t target, uint8_t attacker) {
     }
 
     return 1;
+}
+
+
+// checks if square (target) is under attack by attacking color's pieces
+uint8_t is_attacking(Game *game, uint8_t attacking_player, uint8_t target) {
+    uint8_t attacking_color = attacking_player == PLAYERW ? WHITE : BLACK;
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        if (game->board[i] & attacking_color) {
+            if (is_piece_attacking(game, target, i)) {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
 }
 
 
@@ -254,21 +291,41 @@ uint8_t is_valid_pawn_move(Game *game, uint32_t move) {
         first_move = 1;
     }
 
+    uint8_t from_col = from % 8;
+
     if (is_white(piece)) {
+        if (to - from == 8) {
+            return 1;
+        }
+        else if (to - from == 16 && first_move) {
+            return 1;
+        }
+        else if (to - from == 7 && from_col != 0
+                && ((game->board[to] & BLACK) || (game->w_en_passant_square == to))) {
+            return 1;
+        }
+        else if (to - from == 9 && from_col != 7
+                && ((game->board[to] & BLACK) || (game->w_en_passant_square == to))) {
+            return 1;
+        }
         if (!((to - from) == 8 || ((to - from) == 16 && first_move))
                 && !(((to - from) == 7) && (((game->board[to] & BLACK) == BLACK) 
-                                           || game->w_en_passant_square == to))
+                                           || game->w_en_passant_square == to)
+                    && from_col != 0)
                 && !(((to - from) == 9) && (((game->board[to] & BLACK) == BLACK) 
-                                           || game->w_en_passant_square == to))) {
+                                           || game->w_en_passant_square == to)
+                    && from_col != 7)) {
             return 0;
         }
     }
     else {
         if (!((to - from) == -8 || ((to - from) == -16 && first_move))
                 && !(((to - from) == -7) && (((game->board[to] & WHITE) == WHITE) 
-                                           || game->b_en_passant_square == to))
+                                           || game->b_en_passant_square == to)
+                    && from_col != 7)
                 && !(((to - from) == -9) && (((game->board[to] & WHITE) == WHITE) 
-                                           || game->b_en_passant_square == to))) {
+                                           || game->b_en_passant_square == to)
+                    && from_col != 0)) {
             return 0;
         }
 
@@ -283,14 +340,15 @@ uint8_t is_valid_knight_move(Game *game, uint32_t move) {
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
     
-    // account for negatives
     int8_t delta = to - from;
-    if (delta < 0) {
-        delta = -delta;
-    }
 
-    // possible moves for knight (positive only since negatives eliminated)
-    if (!(delta == 6 || delta == 10 || delta == 15 || delta == 17)) {
+    uint8_t from_col = from % 8;
+
+    // possible moves for knight
+    if (!((from_col > 1 && (delta == 6 || delta == -10)) 
+       || (from_col > 0 && (delta == 15 || delta == -17)) 
+       || (from_col < 7 && (delta == 17 || delta == -15))
+       || (from_col < 6 && (delta == 10 || delta == -6)))) {
         return 0;
     }
 
@@ -304,11 +362,46 @@ uint8_t is_valid_bishop_move(Game *game, uint32_t move) {
     uint8_t to = (move >> 8) & 0xFF;
 
     int8_t delta = to - from;
+    if (from > to) {
+        delta = -delta;
+    }
 
-    // don't need to correct negative deltas due to modulo properties
-    if (!(delta % 7 == 0 || delta % 9 == 0)) {
+    
+    uint8_t diagonal = 0;
+    uint8_t diagonal_squares = 0;
+    
+    if (delta % 9 == 0) {
+        diagonal = 9;
+        diagonal_squares = delta / 9;
+    }
+    else if (delta % 7 == 0) {
+        diagonal = 7;
+        diagonal_squares = delta / 7;
+    }
+    else {
         return 0;
     }
+
+    uint8_t from_col = from % 8;
+
+    if (to > from) {
+        if (diagonal == 7 && !(from_col >= diagonal_squares)) {
+            return 0;
+        }
+        else if (diagonal == 9 && !(from_col <= 7 - diagonal_squares)) {
+            return 0;
+        }
+    }
+    else {
+        if (diagonal == 9 && !(from_col >= diagonal_squares)) {
+            return 0;
+        }
+        else if (diagonal == 7 && !(from_col <= 7 - diagonal_squares)) {
+            return 0;
+        }
+    }
+
+
 
     return 1;
 }
@@ -321,15 +414,12 @@ uint8_t is_valid_rook_move(Game *game, uint32_t move) {
     
     int8_t delta = to - from;
 
-    // don't need to correct negative deltas due to modulo properties
-    if (!(delta % 8 == 0)) {
-        return 0;
-    }
-
     // account for same row movement
     uint8_t start_row_idx = from / 8;
     uint8_t end_row_idx = to / 8;
-    if (!(start_row_idx == end_row_idx)) {
+    
+    // don't need to correct negative deltas due to modulo properties
+    if (!(delta % 8 == 0 || start_row_idx == end_row_idx)) {
         return 0;
     }
 
@@ -338,21 +428,7 @@ uint8_t is_valid_rook_move(Game *game, uint32_t move) {
 
 
 uint8_t is_valid_queen_move(Game *game, uint32_t move) {
-    // deserialize move
-    uint8_t from = move & 0xFF;
-    uint8_t to = (move >> 8) & 0xFF;
-    
-    int8_t delta = to - from;
-
-    // don't need to correct negative deltas due to modulo properties
-    if (!(delta % 7 == 0 || delta % 9 == 0 || delta % 8 == 0)) {
-        return 0;
-    }
-    
-    // account for same row movement
-    uint8_t start_row_idx = from / 8;
-    uint8_t end_row_idx = to / 8;
-    if (!(start_row_idx == end_row_idx)) {
+    if (!(is_valid_bishop_move(game, move) || is_valid_rook_move(game, move))) {
         return 0;
     }
 
@@ -375,6 +451,119 @@ uint8_t is_valid_king_move(Game *game, uint32_t move) {
     uint8_t end_row = to / 8;
 
     if (!((delta == 1 && start_row == end_row) || delta == 7 || delta == 8 || delta == 9)) {
+        // castling moves
+        if (delta == 2 && start_row == end_row) {
+            uint8_t player = (move & MOVE_WHITE_MASK) ? PLAYERW : PLAYERB;
+            if (to > from && can_castle(game, player, 0)) {
+                return 1;
+            }
+            else if (to < from && can_castle(game, player, 1)) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    return 1;
+}
+
+
+// extra
+uint32_t add_move_flags(Game *game, uint32_t move) {
+    // post move flag edits (more should be added here)
+    if (!game->move) {
+        move |= MOVE_WHITE_MASK;
+    }
+    else {
+        move |= MOVE_BLACK_MASK;
+    }
+
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+
+    if (is_king(game->board[from])) {
+        if ((to - from) == 2) {
+            move |= MOVE_KSC_FLAG_MASK;
+        }
+        else if ((from - to) == 2) {
+            move |= MOVE_QSC_FLAG_MASK;
+        }
+    }
+
+    return move;
+}
+
+
+uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
+    // uint8_t castling_color = player == PLAYERW ? WHITE : BLACK;
+    uint8_t opposing_player = player == PLAYERW ? PLAYERB : PLAYERW;
+
+    if (player == PLAYERW) {
+        if (!queenside) {
+            if (!game->castle_kingside_w) {
+                return 0;
+            }
+            
+            // check for obstruction
+            if (game->board[5] != NONE
+                || game->board[6] != NONE) {
+                return 0;
+            }
+
+            // check for intermediate squares being attacked
+            is_attacking(game, opposing_player, 5);
+
+        }
+        else {
+            if (!game->castle_queenside_w) {
+                return 0;
+            }
+            
+            // check for obstruction
+            if (game->board[1] != NONE
+                || game->board[2] != NONE
+                || game->board[3] != NONE) {
+                return 0;
+            }
+
+            // check for intermediate squares being attacked
+            is_attacking(game, opposing_player, 3);
+        }
+    }
+    else {
+        if (!queenside) {
+            if (!game->castle_kingside_b) {
+                return 0;
+            }
+            
+            // check for obstruction
+            if (game->board[61] != NONE
+                || game->board[62] != NONE) {
+                return 0;
+            }
+
+            // check for intermediate squares being attacked
+            is_attacking(game, opposing_player, 61);
+        }
+        else {
+            if (!game->castle_queenside_b) {
+                return 0;
+            }
+            
+            // check for obstruction
+            if (game->board[57] != NONE
+                || game->board[58] != NONE
+                || game->board[59] != NONE) {
+                return 0;
+            }
+
+            // check for intermediate squares being attacked
+            is_attacking(game, opposing_player, 59);
+        }
+    }
+    
+    // check if player is in check
+    if (is_in_check(game, player)) {
         return 0;
     }
 
@@ -391,6 +580,8 @@ MoveList *get_possible_moves(Game *game, uint8_t player) {
         if (game->board[i] & color) {
             for (int j = 0; j < BOARD_SIZE; j++) {
                 uint32_t move = i + (j << 8);
+                move = add_move_flags(game, move);
+
                 uint8_t legal = is_legal_move(game, move);
                 if (legal) {
                     add_move(possible_moves, move);

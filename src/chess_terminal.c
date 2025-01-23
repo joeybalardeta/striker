@@ -11,6 +11,9 @@
 #include "move.h"
 #include "utils.h"
 
+// debug define macros (enables compilation of printf statements)
+// #define DEBUG_POSSIBLE_MOVES
+
 void chess_terminal() {
     printf("\nInteractive Chess Terminal:\n");
     while (1) {
@@ -73,7 +76,10 @@ void execute_option(uint32_t option) {
 
         case 5:	{           // perft move generation (with FEN)
             Game *game = load_fen_game("./fen/move_generation_fen.txt");
+            // dump_game_info(game);
+            // printf("\n\n");
             print_board(game);
+            printf("\n");
             print_possible_moves(game);
             delete_game(game);
             break;
@@ -156,6 +162,11 @@ void game_loop(Game *game) {
 
 
 uint8_t game_tick(Game *game) {
+    #ifdef DEBUG_POSSIBLE_MOVES
+    print_possible_moves(game);
+    printf("\n");
+    #endif
+
     // get move
     uint32_t move = 0;
     if (!game->move) {
@@ -180,6 +191,15 @@ uint8_t game_tick(Game *game) {
     }
 
     printf("\n");
+    
+    #ifdef DEBUG_POSSIBLE_MOVES
+    printf(!game->move ? "White" : "Black");
+    printf(" made move: ");
+    print_move(move);
+    printf("\n");
+    printf("0x%x\n", move);
+    printf("\n");
+    #endif
 
     // make move
     move_piece(game, move);
@@ -195,6 +215,7 @@ uint8_t game_tick(Game *game) {
     }
 
     if (kings != 2) {
+        print_board(game);
         return 1;
     }
 
@@ -212,13 +233,7 @@ uint32_t get_valid_user_move(Game *game) {
         move = (uint32_t) get_user_move();
     }
     
-    // post move flag adding
-    if (!game->move) {
-        move |= MOVE_WHITE_MASK;
-    }
-    else {
-        move |= MOVE_BLACK_MASK;
-    }
+    move = add_move_flags(game, move);
 
     // printf("Move: 0x%x\n", move);
     return move;

@@ -45,6 +45,7 @@ void set_player_b(Game *game, uint8_t player_b);
 void print_all_square_values(Game *game);
 void set_default_board(Game *game);
 void move_piece(Game *game, uint32_t move);
+void modify_castling_rights(Game *game, uint32_t move);
 void print_board(Game *game);
 void print_board_reverse(Game *game);
 

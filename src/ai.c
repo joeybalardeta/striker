@@ -36,6 +36,7 @@ void print_possible_moves(Game *game) {
     printf("...\n");
     
     MoveList *possible_moves = get_possible_moves(game, player);
+    printf("%d possible moves found.\n\n", possible_moves->length);
 
     print_movelist(possible_moves);
 }
