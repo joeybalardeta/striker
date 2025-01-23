@@ -294,20 +294,6 @@ uint8_t is_valid_pawn_move(Game *game, uint32_t move) {
     uint8_t from_col = from % 8;
 
     if (is_white(piece)) {
-        if (to - from == 8) {
-            return 1;
-        }
-        else if (to - from == 16 && first_move) {
-            return 1;
-        }
-        else if (to - from == 7 && from_col != 0
-                && ((game->board[to] & BLACK) || (game->w_en_passant_square == to))) {
-            return 1;
-        }
-        else if (to - from == 9 && from_col != 7
-                && ((game->board[to] & BLACK) || (game->w_en_passant_square == to))) {
-            return 1;
-        }
         if (!((to - from) == 8 || ((to - from) == 16 && first_move))
                 && !(((to - from) == 7) && (((game->board[to] & BLACK) == BLACK) 
                                            || game->w_en_passant_square == to)
