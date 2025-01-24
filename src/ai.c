@@ -19,7 +19,7 @@ uint32_t get_computer_move(Game *game, uint8_t player) {
     printf("...\n");
     #endif
 
-    MoveList *possible_moves = get_possible_moves(game, player);
+    MoveList *possible_moves = get_possible_moves(game);
 
     srand(time(NULL)); 
 
@@ -35,8 +35,33 @@ void print_possible_moves(Game *game) {
     printf(player == PLAYERW ? "White" : "Black");
     printf("...\n");
     
-    MoveList *possible_moves = get_possible_moves(game, player);
+    MoveList *possible_moves = get_possible_moves(game);
     printf("%d possible moves found.\n\n", possible_moves->length);
 
     print_movelist(possible_moves);
+}
+
+
+uint32_t perft(Game *game, int8_t depth) {
+    MoveList *possible_moves = get_possible_moves(game);
+
+    if (depth == 0) {
+        return possible_moves->length;
+    }
+
+    uint32_t total_moves = 0;
+
+    MoveListEntry* mle = possible_moves->first;
+    for (int i = 0; i < possible_moves->length; i++) {
+        Game *clone = clone_game(game);
+        move_piece(clone, mle->move);
+        uint32_t moves = perft(clone, depth - 1);
+        delete_game(clone);
+
+        mle = mle->next;
+
+        total_moves += moves;
+    }
+
+    return total_moves;
 }

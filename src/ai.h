@@ -7,5 +7,6 @@
 
 uint32_t get_computer_move(Game *game, uint8_t player);
 void print_possible_moves(Game *game);
+uint32_t perft(Game *game, int8_t depth);
 
 #endif

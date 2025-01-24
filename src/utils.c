@@ -1,6 +1,15 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
+#include <sys/time.h>
 #include "utils.h"
+
+
+// other define statements
+#define CLOCK_TYPE CLOCK_REALTIME
+// #define CLOCK_TYPE CLOCK_THREAD_CPUTIME_ID
 
 
 uint8_t str_to_square(char *str) {
@@ -29,4 +38,24 @@ void print_move(uint32_t move) {
     print_square(from);
     printf(", ");
     print_square(to);
+}
+
+
+uint32_t get_time_us() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    return (tv.tv_sec * 1000000) + tv.tv_usec;
+}
+
+
+// gets thread specific time
+uint32_t get_time_ns() {
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_TYPE, &ts) == 0) {
+        return (ts.tv_sec * 1000000000) + ts.tv_nsec;
+    } else {
+        return 0;
+    }
 }

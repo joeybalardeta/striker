@@ -10,6 +10,7 @@ OBJ=obj/
 
 CC=gcc
 CFLAGS=-Wall -std=c11
+LFLAGS=-lrt
 COMPILE=$(CC) $(CFLAGS)
 OBJS:=$(patsubst $(SRC)%.c, $(OBJ)%.o, $(wildcard $(SRC)*.c))
 
@@ -20,7 +21,7 @@ $(OBJ)%.o: $(SRC)%.c
 	$(COMPILE) -c $< -o $@
 
 all: init $(OBJS)
-	$(COMPILE) $(OBJS) -o $(PROJECT_NAME)
+	$(COMPILE) $(OBJS) -o $(PROJECT_NAME) $(LFLAGS)
 
 clean_obj:
 	rm -f $(OBJ)*.o

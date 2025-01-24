@@ -557,9 +557,10 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
 }
 
 
-MoveList *get_possible_moves(Game *game, uint8_t player) {
+MoveList *get_possible_moves(Game *game) {
     MoveList *possible_moves = create_movelist();
 
+    uint8_t player = !game->move ? PLAYERW : PLAYERB;
     uint32_t color = player == PLAYERW ? WHITE : BLACK;
 
     for (int i = 0; i < BOARD_SIZE; i++) {
