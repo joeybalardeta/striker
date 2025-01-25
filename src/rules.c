@@ -11,7 +11,7 @@
 // debug define macros (enables compilation of printf statements)
 // #define DEBUG_CHECK
 // #define DEBUG_MOVE_INVALIDATION
-
+// #define DEBUG_CASTLING
 
 uint8_t is_legal_move(Game *game, uint32_t move) {
     // get the moving player
@@ -138,6 +138,7 @@ uint8_t is_in_check(Game *game, uint8_t player) {
         }
     }
 
+
     return 0;
 }
 
@@ -201,7 +202,7 @@ uint8_t is_move_unobstructed(Game *game, uint32_t move) {
     }
 
     // up-left and down-right diagonals
-    if (delta % 7 == 0) {
+    if (delta % 7 == 0 && start_row_idx != end_row_idx) {
         for (int i = start + 7; i < end; i += 7) {
             if (game->board[i] != 0) {
                 return 0;
@@ -265,11 +266,30 @@ uint8_t is_attacking(Game *game, uint8_t attacking_player, uint8_t target) {
     uint8_t attacking_color = attacking_player == PLAYERW ? WHITE : BLACK;
     for (int i = 0; i < BOARD_SIZE; i++) {
         if (game->board[i] & attacking_color) {
-            if (is_piece_attacking(game, target, i)) {
+            if (is_piece_attacking(game, i, target)) {
                 return 1;
             }
         }
     }
+
+    // temporary pawn diagonal fix
+    if (attacking_player == PLAYERB) {
+        if ((game->board[target + 7] & attacking_color) && is_pawn(game->board[target + 7])) {
+            return 1;
+        }
+        if ((game->board[target + 9] & attacking_color) && is_pawn(game->board[target + 9])) {
+            return 1;
+        }
+    }
+    else {
+        if ((game->board[target - 7] & attacking_color) && is_pawn(game->board[target - 7])) {
+            return 1;
+        }
+        if ((game->board[target - 9] & attacking_color) && is_pawn(game->board[target - 9])) {
+            return 1;
+        }
+    }
+
 
     return 0;
 }
@@ -293,8 +313,9 @@ uint8_t is_valid_pawn_move(Game *game, uint32_t move) {
 
     uint8_t from_col = from % 8;
 
+    // this looks terrible, should change it later
     if (is_white(piece)) {
-        if (!((to - from) == 8 || ((to - from) == 16 && first_move))
+        if (!((((to - from) == 8) && game->board[to] == NONE) || (((to - from) == 16 && first_move) && game->board[to] == NONE))
                 && !(((to - from) == 7) && (((game->board[to] & BLACK) == BLACK) 
                                            || game->w_en_passant_square == to)
                     && from_col != 0)
@@ -305,7 +326,7 @@ uint8_t is_valid_pawn_move(Game *game, uint32_t move) {
         }
     }
     else {
-        if (!((to - from) == -8 || ((to - from) == -16 && first_move))
+        if (!((((to - from) == -8) && game->board[to] == NONE) || (((to - from) == -16 && first_move) && game->board[to] == NONE))
                 && !(((to - from) == -7) && (((game->board[to] & WHITE) == WHITE) 
                                            || game->b_en_passant_square == to)
                     && from_col != 7)
@@ -484,24 +505,42 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
     // uint8_t castling_color = player == PLAYERW ? WHITE : BLACK;
     uint8_t opposing_player = player == PLAYERW ? PLAYERB : PLAYERW;
 
+    #ifdef DEBUG_CASTLING
+    printf("%s %s castle.\n", player == PLAYERW ? "White" : "Black", !queenside ? "kingside" : "queenside");
+    #endif
+
     if (player == PLAYERW) {
         if (!queenside) {
             if (!game->castle_kingside_w) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, no permission.\n");
+                #endif
                 return 0;
             }
             
             // check for obstruction
             if (game->board[5] != NONE
                 || game->board[6] != NONE) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                #endif
                 return 0;
             }
 
             // check for intermediate squares being attacked
-            is_attacking(game, opposing_player, 5);
+            if (is_attacking(game, opposing_player, 5)) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, attacking piece.\n");
+                #endif
+                return 0;
+            }
 
         }
         else {
             if (!game->castle_queenside_w) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, no permission.\n");
+                #endif
                 return 0;
             }
             
@@ -509,30 +548,50 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
             if (game->board[1] != NONE
                 || game->board[2] != NONE
                 || game->board[3] != NONE) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                printf("1: %u | 2: %u | 3: %u\n", game->board[1], game->board[2], game->board[3]);
+                #endif
                 return 0;
             }
 
             // check for intermediate squares being attacked
-            is_attacking(game, opposing_player, 3);
+            if (is_attacking(game, opposing_player, 3)) {
+                return 0;
+            }
         }
     }
     else {
         if (!queenside) {
             if (!game->castle_kingside_b) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, no permission.\n");
+                #endif
                 return 0;
             }
             
             // check for obstruction
             if (game->board[61] != NONE
                 || game->board[62] != NONE) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                #endif
                 return 0;
             }
 
             // check for intermediate squares being attacked
-            is_attacking(game, opposing_player, 61);
+            if (is_attacking(game, opposing_player, 61)) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                #endif
+                return 0;
+            }
         }
         else {
             if (!game->castle_queenside_b) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, no permission.\n");
+                #endif
                 return 0;
             }
             
@@ -540,11 +599,19 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
             if (game->board[57] != NONE
                 || game->board[58] != NONE
                 || game->board[59] != NONE) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                #endif
                 return 0;
             }
 
             // check for intermediate squares being attacked
-            is_attacking(game, opposing_player, 59);
+            if (is_attacking(game, opposing_player, 59)) {
+                #ifdef DEBUG_CASTLING
+                printf("Cannot castle, obstructing piece(s).\n");
+                #endif
+                return 0;
+            }
         }
     }
     

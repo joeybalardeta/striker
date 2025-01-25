@@ -120,6 +120,13 @@ void move_piece(Game *game, uint32_t move) {
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
     
+    if (move & MOVE_WHITE_MASK) {
+        game->b_en_passant_square = 0xFF;
+    }
+    else {
+        game->w_en_passant_square = 0xFF;
+    }
+
     // en passant targeting
     if (is_pawn(game->board[from])) {
         int8_t delta = to - from;
@@ -127,16 +134,10 @@ void move_piece(Game *game, uint32_t move) {
             if (delta == 16) {
                 game->b_en_passant_square = from + 8;
             }
-            else {
-                game->b_en_passant_square = 0xFF;
-            }
         }
         else {
             if (delta == -16) {
                 game->w_en_passant_square = from - 8;
-            }
-            else {
-                game->w_en_passant_square = 0xFF;
             }
         }
     }
@@ -156,14 +157,16 @@ void move_piece(Game *game, uint32_t move) {
     }
 
     // castling moves
-    if (is_king(game->board[from]) & MOVE_KSC_FLAG_MASK) {
+    if (is_king(game->board[from]) && (move & MOVE_KSC_FLAG_MASK)) {
         game->board[from + 1] = game->board[from + 3];
         game->board[from + 3] = NONE;
     }
-    else if (is_king(game->board[from]) & MOVE_QSC_FLAG_MASK) {
+    else if (is_king(game->board[from]) && (move & MOVE_QSC_FLAG_MASK)) {
         game->board[from - 1] = game->board[from - 4];
         game->board[from - 4] = NONE;
     }
+
+    modify_castling_rights(game, move);
 
 
     // end changes
@@ -187,20 +190,13 @@ void modify_castling_rights(Game *game, uint32_t move) {
     }
 
     // castling
-    if (move & MOVE_KSC_FLAG_MASK) {
+    if ((move & MOVE_KSC_FLAG_MASK) || (move & MOVE_QSC_FLAG_MASK)) {
         if (move & MOVE_WHITE_MASK) {
             game->castle_kingside_w = 0;
-        }
-        else {
-            game->castle_kingside_b = 0;
-        }
-        return;
-    }
-    if ((move & MOVE_QSC_FLAG_MASK)) {
-        if (move & MOVE_WHITE_MASK) {
             game->castle_queenside_w = 0;
         }
         else {
+            game->castle_kingside_b = 0;
             game->castle_queenside_b = 0;
         }
         return;
@@ -240,7 +236,7 @@ void modify_castling_rights(Game *game, uint32_t move) {
         }
     }
     
-    // rook capture moves (or they aren't there, and castling is already disabled):w
+    // rook capture moves (or they aren't there, and castling is already disabled)
     if (to == 7) {
         game->castle_kingside_w = 0;
     }

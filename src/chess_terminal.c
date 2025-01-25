@@ -118,7 +118,7 @@ void execute_option(uint32_t option) {
 
             printf("Running PERFT test:\n\n");
 
-            for (int i = 0; i <= max_depth; i++) {
+            for (int i = 1; i <= max_depth; i++) {
                 uint32_t start_time, end_time, elapsed_time;
                 double elapsed_time_formatted;
                 
@@ -284,14 +284,13 @@ uint8_t game_tick(Game *game) {
 uint32_t get_valid_user_move(Game *game) {
     printf("Enter move: ");
     uint32_t move = (uint32_t) get_user_move();
+    move = add_move_flags(game, move);
 
     while (!is_legal_move(game, move)) {
         printf("Invalid move!\n");
         printf("Enter move: ");
         move = (uint32_t) get_user_move();
     }
-    
-    move = add_move_flags(game, move);
 
     // printf("Move: 0x%x\n", move);
     return move;
