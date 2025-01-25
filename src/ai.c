@@ -12,7 +12,7 @@
 
 // debug define macros (enables compilation of printf statements)
 // #define DEBUG_AI
-// #define DEBUG_PERFT
+#define DEBUG_PERFT
 
 uint32_t get_computer_move(Game *game, uint8_t player) {
     #ifdef DEBUG_AI

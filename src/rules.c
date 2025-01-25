@@ -624,6 +624,27 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
 }
 
 
+uint8_t is_pawn_promotion_move(Game *game, uint32_t move) {
+    uint8_t from = move & 0xFF;
+    uint8_t to = (move >> 8) & 0xFF;
+
+    if (is_pawn(game->board[from])) {
+        if (move & MOVE_WHITE_MASK) {
+            if ((to / 8) == 7) {
+                return 1;
+            }
+        }
+        else {
+            if ((to / 8) == 0) {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
 MoveList *get_possible_moves(Game *game) {
     MoveList *possible_moves = create_movelist();
 
@@ -638,7 +659,15 @@ MoveList *get_possible_moves(Game *game) {
 
                 uint8_t legal = is_legal_move(game, move);
                 if (legal) {
-                    add_move(possible_moves, move);
+                    if (!is_pawn_promotion_move(game, move)) {
+                        add_move(possible_moves, move);
+                    }
+                    else {
+                        add_move(possible_moves, move | MOVE_NP_FLAG_MASK);
+                        add_move(possible_moves, move | MOVE_BP_FLAG_MASK);
+                        add_move(possible_moves, move | MOVE_RP_FLAG_MASK);
+                        add_move(possible_moves, move | MOVE_QP_FLAG_MASK);
+                    }
                 }
             }
         }

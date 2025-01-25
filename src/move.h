@@ -25,10 +25,10 @@
 #define MOVE_KSC_FLAG_MASK  0x00010000  // bit 16
 #define MOVE_QSC_FLAG_MASK  0x00020000  // bit 17
 #define MOVE_EP_FLAG_MASK   0x00040000  // bit 18
-#define MOVE_KPP_FLAG_MASK  0x00080000  // bit 19
-#define MOVE_BPP_FLAG_MASK  0x000F0000  // bit 20
-#define MOVE_RPP_FLAG_MASK  0x00100000  // bit 21
-#define MOVE_QPP_FLAG_MASK  0x00200000  // bit 22
+#define MOVE_NP_FLAG_MASK   0x00080000  // bit 19
+#define MOVE_BP_FLAG_MASK   0x000F0000  // bit 20
+#define MOVE_RP_FLAG_MASK   0x00100000  // bit 21
+#define MOVE_QP_FLAG_MASK   0x00200000  // bit 22
 #define MOVE_WHITE_MASK     0x00400000  // bit 23
 #define MOVE_BLACK_MASK     0x00800000  // bit 24
 

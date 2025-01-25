@@ -169,6 +169,22 @@ void move_piece(Game *game, uint32_t move) {
     modify_castling_rights(game, move);
 
 
+    // pawn promotion handling
+    uint32_t piece_color = (move & MOVE_WHITE_MASK ) ? WHITE : BLACK;
+    if (MOVE_NP_FLAG_MASK) {
+        game->board[from] = piece_color | KNIGHT;
+    }
+    else if (MOVE_BP_FLAG_MASK) {
+        game->board[from] = piece_color | BISHOP;
+    }
+    else if (MOVE_RP_FLAG_MASK) {
+        game->board[from] = piece_color | ROOK;
+    }
+    else if (MOVE_QP_FLAG_MASK) {
+        game->board[from] = piece_color | QUEEN;
+    }
+
+
     // end changes
     game->board[to] = game->board[from];
 

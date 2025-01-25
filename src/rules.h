@@ -24,6 +24,7 @@ uint8_t is_valid_king_move(Game *game, uint32_t move);
 // extra 
 uint32_t add_move_flags(Game *game, uint32_t move);
 uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside);
+uint8_t is_pawn_promotion_move(Game *game, uint32_t move);
 MoveList *get_possible_moves(Game *game);
 
 #endif
