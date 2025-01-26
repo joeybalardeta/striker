@@ -5,10 +5,17 @@
 #include "game.h"
 #include "movelist.h"
 
+// defines
+#define CHECKMATE 1
+#define STALEMATE 2
+#define DRAW_IM 3
+#define DRAW_R 4
+
 // major move validator functions
 uint8_t is_legal_move(Game *game, uint32_t move);
 uint8_t is_in_check(Game *game, uint8_t player);
 uint8_t is_checkmate(Game *game);
+uint8_t is_draw(Game *game);
 uint8_t is_valid_piece_move(Game *game, uint32_t move);
 uint8_t is_move_unobstructed(Game *game, uint32_t move);
 uint8_t is_piece_attacking(Game *game, uint8_t attacker, uint8_t target);

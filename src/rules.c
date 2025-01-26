@@ -148,14 +148,82 @@ uint8_t is_in_check(Game *game, uint8_t player) {
 
 
 uint8_t is_checkmate(Game *game) {
+    uint8_t player = !game->move ? PLAYERW : PLAYERB;
+
     MoveList *possible_moves = get_possible_moves(game);
     uint16_t moves = possible_moves->length;
     delete_movelist(possible_moves);
 
-    if (moves == 0) {
-        return 1;
+    if (moves == 0 && is_in_check(game, player)) {
+        return CHECKMATE;
     }
     return 0;
+}
+
+
+uint8_t is_draw(Game *game) {
+    uint8_t player = !game->move ? PLAYERW : PLAYERB;
+
+    MoveList *possible_moves = get_possible_moves(game);
+    uint16_t moves = possible_moves->length;
+    delete_movelist(possible_moves);
+
+    // stalemate
+    if (moves == 0 && is_in_check(game, player)) {
+        return STALEMATE;
+    }
+
+    // draw by insufficient material
+    uint8_t pc_w = 0;   // piece count white
+    uint8_t pc_b = 0;   // piece count black
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        uint8_t piece = game->board[i];
+        if (piece & WHITE) {
+            if (is_pawn(piece)) {
+                pc_w += 2;
+            }
+            else if (is_knight(piece)) {
+                pc_w += 1;
+            }
+            else if (is_bishop(piece)) {
+                pc_w += 1;
+            }
+            else if (is_rook(piece)) {
+                pc_w += 2;
+            }
+            else if (is_queen(piece)) {
+                pc_w += 2;
+            }
+        }
+        if (piece & BLACK) {
+            if (is_pawn(piece)) {
+                pc_b += 2;
+            }
+            else if (is_knight(piece)) {
+                pc_b += 1;
+            }
+            else if (is_bishop(piece)) {
+                pc_b += 1;
+            }
+            else if (is_rook(piece)) {
+                pc_b += 2;
+            }
+            else if (is_queen(piece)) {
+                pc_b += 2;
+            }
+        }
+
+        if ((pc_w > 1) || (pc_b > 1)) {
+            break;
+        }
+    }
+
+    if ((pc_w < 2) && (pc_b < 2)) {
+        return DRAW_IM;
+    }
+
+    return 0;
+
 }
 
 

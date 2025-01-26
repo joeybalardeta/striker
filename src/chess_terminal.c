@@ -206,15 +206,42 @@ void print_options() {
 
 
 void game_loop(Game *game) {
+    uint8_t game_state;
     while (1) {
         // game state codes:
-        // 0 - game is normal, continue
-        // 1 - game is done, exit loop
-        uint8_t game_state = game_tick(game);
+        // 0 - game is not finished, continue
+        // 1 - game is finished, checkmate
+        // 2 - game is finished, stalemate
+        // 3 - game is finished, draw by insufficient material
+        // 4 - game is finished, draw by repetition
+        game_state = game_tick(game);
 
-        if (game_state == 1) {
+        if (game_state != 0) {
             break;
         }
+    }
+
+    // handling the game's end condition
+    switch (game_state) {
+        case CHECKMATE:
+            printf("Checkmate! %s wins!\n", !game->move ? "White" : "Black");
+            break;
+        
+        case STALEMATE:
+            printf("Stalemate!\n");
+            break;
+        
+        case DRAW_IM:
+            printf("Draw by insufficient material!\n");
+            break;
+
+        case DRAW_R:
+            printf("Draw by repetition!\n");
+            break;
+
+        default:
+            printf("This shouldn't print out!\n");
+            break;
     }
 }
 
@@ -262,22 +289,25 @@ uint8_t game_tick(Game *game) {
     // make move
     move_piece(game, move);
 
+
+    // check game state (returns for loop exiting)
+    uint8_t ischeckmate = is_checkmate(game);
+    uint8_t isdraw = is_draw(game);
+    if (ischeckmate) {
+        print_board(game);
+        printf("\n\n");
+        return ischeckmate;
+    }
+    else if (isdraw) {
+        print_board(game);
+        printf("\n\n");
+        return isdraw;
+    }
+
     // set up for next iteration
     change_turn(game);
     
-    uint8_t kings = 0;
-    for (int i = 0; i < BOARD_SIZE; i++) {
-        if (is_king(game->board[i])) {
-            kings++;
-        }
-    }
-
-    if (kings != 2) {
-        print_board(game);
-        return 1;
-    }
-
-    // check game state (returns for loop exiting)
+    // return 0 (game continues)
     return 0;
 }
 
