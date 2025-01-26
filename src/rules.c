@@ -77,15 +77,19 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
     Game *clone = clone_game(game);
     move_piece(clone, move);
     if (is_in_check(clone, active_player)) {
-        delete_game(clone);
         #ifdef DEBUG_MOVE_INVALIDATION
+        print_board(clone);
         printf("Move invalidated - move places king in check!\n");
+        uint8_t opposing_player = !game->move ? PLAYERB : PLAYERW;
+        uint8_t king_square = get_king_square(clone, active_player);
+        printf("Checking square: %u\n", get_attacking_square(clone, opposing_player, king_square));
         #endif
+        
+        delete_game(clone);
         return 0;
     }
+    
     delete_game(clone);
-
-
     return 1;
 }
 
@@ -139,6 +143,18 @@ uint8_t is_in_check(Game *game, uint8_t player) {
     }
 
 
+    return 0;
+}
+
+
+uint8_t is_checkmate(Game *game) {
+    MoveList *possible_moves = get_possible_moves(game);
+    uint16_t moves = possible_moves->length;
+    delete_movelist(possible_moves);
+
+    if (moves == 0) {
+        return 1;
+    }
     return 0;
 }
 
@@ -274,24 +290,67 @@ uint8_t is_attacking(Game *game, uint8_t attacking_player, uint8_t target) {
 
     // temporary pawn diagonal fix
     if (attacking_player == PLAYERB) {
-        if ((game->board[target + 7] & attacking_color) && is_pawn(game->board[target + 7])) {
+        if ((game->board[target + 7] & attacking_color) && is_pawn(game->board[target + 7])
+            && (target % 8 != 0)) {
             return 1;
         }
-        if ((game->board[target + 9] & attacking_color) && is_pawn(game->board[target + 9])) {
+        if ((game->board[target + 9] & attacking_color) && is_pawn(game->board[target + 9])
+            && (target % 8 != 7)) {
             return 1;
         }
     }
     else {
-        if ((game->board[target - 7] & attacking_color) && is_pawn(game->board[target - 7])) {
+        if ((game->board[target - 7] & attacking_color) && is_pawn(game->board[target - 7])
+            && (target % 8 != 7)) {
             return 1;
         }
-        if ((game->board[target - 9] & attacking_color) && is_pawn(game->board[target - 9])) {
+        if ((game->board[target - 9] & attacking_color) && is_pawn(game->board[target - 9])
+            && (target % 8 != 0)) {
             return 1;
         }
     }
 
 
     return 0;
+}
+
+
+// return first found 'attacking square' for a given target square
+// attacking square = square that attacking piece is on
+uint8_t get_attacking_square(Game *game, uint8_t attacking_player, uint8_t target) {
+    uint8_t attacking_color = attacking_player == PLAYERW ? WHITE : BLACK;
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        if (game->board[i] & attacking_color) {
+            if (is_piece_attacking(game, i, target)) {
+                return i;
+            }
+        }
+    }
+
+    // temporary pawn diagonal fix
+    if (attacking_player == PLAYERB) {
+        if ((game->board[target + 7] & attacking_color) && is_pawn(game->board[target + 7])
+            && (target % 8 != 0)) {
+            return target + 7;
+        }
+        if ((game->board[target + 9] & attacking_color) && is_pawn(game->board[target + 9])
+            && (target % 8 != 7)) {
+            return target + 9;
+        }
+    }
+    else {
+        if ((game->board[target - 7] & attacking_color) && is_pawn(game->board[target - 7])
+            && (target % 8 != 7)) {
+            return target - 7;
+        }
+        if ((game->board[target - 9] & attacking_color) && is_pawn(game->board[target - 9])
+            && (target % 8 != 0)) {
+            return target - 9;
+        }
+    }
+
+
+    return 0xFF;
 }
 
 
@@ -501,6 +560,19 @@ uint32_t add_move_flags(Game *game, uint32_t move) {
 }
 
 
+uint8_t get_king_square(Game *game, uint8_t player) {
+    uint8_t color = player == PLAYERW ? WHITE : BLACK;
+
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        if ((game->board[i] & color) && is_king(game->board[i])) {
+            return i;
+        }
+    }
+
+    return 0xFF;
+}
+
+
 uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
     // uint8_t castling_color = player == PLAYERW ? WHITE : BLACK;
     uint8_t opposing_player = player == PLAYERW ? PLAYERB : PLAYERW;
@@ -617,9 +689,15 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
     
     // check if player is in check
     if (is_in_check(game, player)) {
+        #ifdef DEBUG_CASTLING
+        printf("Cannot castle, king in check.\n");
+        #endif
         return 0;
     }
 
+    #ifdef DEBUG_CASTLING
+    printf("Can castle.\n");
+    #endif
     return 1;
 }
 

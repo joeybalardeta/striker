@@ -171,16 +171,16 @@ void move_piece(Game *game, uint32_t move) {
 
     // pawn promotion handling
     uint32_t piece_color = (move & MOVE_WHITE_MASK ) ? WHITE : BLACK;
-    if (MOVE_NP_FLAG_MASK) {
+    if (move & MOVE_NP_FLAG_MASK) {
         game->board[from] = piece_color | KNIGHT;
     }
-    else if (MOVE_BP_FLAG_MASK) {
+    else if (move & MOVE_BP_FLAG_MASK) {
         game->board[from] = piece_color | BISHOP;
     }
-    else if (MOVE_RP_FLAG_MASK) {
+    else if (move & MOVE_RP_FLAG_MASK) {
         game->board[from] = piece_color | ROOK;
     }
-    else if (MOVE_QP_FLAG_MASK) {
+    else if (move & MOVE_QP_FLAG_MASK) {
         game->board[from] = piece_color | QUEEN;
     }
 

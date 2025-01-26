@@ -12,7 +12,7 @@
 
 // debug define macros (enables compilation of printf statements)
 // #define DEBUG_AI
-#define DEBUG_PERFT
+// #define DEBUG_PERFT
 
 uint32_t get_computer_move(Game *game, uint8_t player) {
     #ifdef DEBUG_AI
@@ -26,6 +26,8 @@ uint32_t get_computer_move(Game *game, uint8_t player) {
     srand(time(NULL)); 
 
     uint32_t move = get_movelistentry(possible_moves, rand() % possible_moves->length)->move;
+
+    delete_movelist(possible_moves);
 
     return move;
 }
@@ -41,6 +43,8 @@ void print_possible_moves(Game *game) {
     printf("%d possible moves found.\n\n", possible_moves->length);
 
     print_movelist(possible_moves);
+
+    delete_movelist(possible_moves);
 }
 
 
@@ -54,7 +58,10 @@ uint32_t perft(Game *game, int8_t depth) {
     MoveList *possible_moves = get_possible_moves(game);
 
     if (depth == 1) {
-        return possible_moves->length;
+        uint16_t moves = possible_moves->length;
+        
+        delete_movelist(possible_moves);
+        return moves;
     }
 
     uint32_t total_moves = 0;
@@ -78,6 +85,8 @@ uint32_t perft(Game *game, int8_t depth) {
 
         total_moves += moves;
     }
+
+    delete_movelist(possible_moves);
 
     return total_moves;
 }
