@@ -33,6 +33,9 @@ typedef struct {
                                         // if larger than 63, invalid, if <= 63, valid
     uint8_t b_en_passant_square;		// en passant attack square for black (changed on white move)
                                         // if larger than 63, invalid, if <= 63, valid
+
+    uint8_t king_square_w;
+    uint8_t king_square_b;
 } Game;
 
 

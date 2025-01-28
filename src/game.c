@@ -25,6 +25,9 @@ Game *create_game() {
     game->w_en_passant_square = 0xFF;
     game->b_en_passant_square = 0xFF;
 
+    game->king_square_w = 0xFF;
+    game->king_square_b = 0xFF;
+
     for (int i = 0; i < 64; i++) {
         game->board[i] = NONE;
     }
@@ -50,6 +53,9 @@ Game *clone_game(Game *game) {
     for (int i = 0; i < 64; i++) {
         clone->board[i] = game->board[i];
     }
+
+    clone->king_square_w = game->king_square_w;
+    clone->king_square_b = game->king_square_b;
 
     return clone;
 }	
@@ -182,6 +188,16 @@ void move_piece(Game *game, uint32_t move) {
     }
     else if (move & MOVE_QP_FLAG_MASK) {
         game->board[from] = piece_color | QUEEN;
+    }
+
+    // updates to king location
+    if (is_king(game->board[from])) {
+        if (move & MOVE_WHITE_MASK) {
+            game->king_square_w = to;
+        }
+        else {
+            game->king_square_b = to;
+        }
     }
 
 

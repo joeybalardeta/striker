@@ -95,27 +95,9 @@ uint8_t is_legal_move(Game *game, uint32_t move) {
 
 
 uint8_t is_in_check(Game *game, uint8_t player) {
-    uint32_t attacking_color;
+    uint32_t attacking_color = player == PLAYERW ? BLACK : WHITE;
 
-    uint8_t king_idx;
-    if (player == PLAYERW) {
-        attacking_color = BLACK;
-        for (int i = 0; i < 64; i++) {
-            if (game->board[i] == (KING | WHITE)) {
-                king_idx = i;
-                break;
-            }
-        }
-    }
-    else {
-        attacking_color = WHITE;
-        for (int i = 0; i < 64; i++) {
-            if (game->board[i] == (KING | BLACK)) {
-                king_idx = i;
-                break;
-            }
-        }
-    }
+    uint8_t king_idx = get_king_square(game, player);
 
     for (int i = 0; i < 64; i++) {
         #ifdef DEBUG_CHECK
@@ -631,10 +613,16 @@ uint32_t add_move_flags(Game *game, uint32_t move) {
 uint8_t get_king_square(Game *game, uint8_t player) {
     uint8_t color = player == PLAYERW ? WHITE : BLACK;
 
-    for (int i = 0; i < BOARD_SIZE; i++) {
-        if ((game->board[i] & color) && is_king(game->board[i])) {
-            return i;
+    if ((game->king_square_w == 0xFF && color == WHITE)
+        || (game->king_square_b == 0xFF && color == BLACK)) {
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            if ((game->board[i] & color) && is_king(game->board[i])) {
+                return i;
+            }
         }
+    }
+    else {
+        return color == WHITE ? game->king_square_w : game->king_square_b;
     }
 
     return 0xFF;
