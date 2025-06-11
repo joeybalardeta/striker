@@ -19,4 +19,4 @@ A custom chess engine, written in C. A rewrite of frostbyte focused on simplicit
  - Developed in MacOS Sonoma and WSL Ubuntu
  - Compiled with gcc
  - Debugged and validated with valgrind
- - Compatibile with any OS (gcc and make required for compilation)
+ - Compatible with any OS (gcc and make required for compilation)
