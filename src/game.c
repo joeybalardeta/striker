@@ -464,7 +464,7 @@ Game *load_fen_game(const char *filepath) {
 
     if (en_passant_file != '-') {
         en_passant_file -= 'a';
-        en_passant_file -= '1';
+        en_passant_rank -= '1';
 
         uint8_t en_passant_target_square = (en_passant_file * 8) + en_passant_rank;
 
