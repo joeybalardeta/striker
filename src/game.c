@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "game.h"
 #include "player.h"
 #include "piece.h"
@@ -38,27 +39,9 @@ Game *create_game() {
 
 Game *clone_game(Game *game) {
     Game *clone = malloc(sizeof(Game));
-    clone->player_w = game->player_w;
-    clone->player_b = game->player_b;
-    clone->move = game->move;
-    
-    clone->castle_kingside_w = game->castle_kingside_w;
-    clone->castle_queenside_w = game->castle_queenside_w;
-    clone->castle_kingside_b = game->castle_kingside_b;
-    clone->castle_queenside_b = game->castle_queenside_b;
-    
-    clone->w_en_passant_square = game->w_en_passant_square;
-    clone->b_en_passant_square = game->b_en_passant_square;
-
-    for (int i = 0; i < 64; i++) {
-        clone->board[i] = game->board[i];
-    }
-
-    clone->king_square_w = game->king_square_w;
-    clone->king_square_b = game->king_square_b;
-
+    memcpy(clone, game, sizeof(Game));
     return clone;
-}	
+}
 
 
 void delete_game(Game *game) {
@@ -133,29 +116,21 @@ void move_piece(Game *game, uint32_t move) {
         game->w_en_passant_square = 0xFF;
     }
 
-    // en passant targeting
+    // en passant targeting and attacking (single pawn check for both)
     if (is_pawn(game->board[from])) {
         int8_t delta = to - from;
         if (move & MOVE_WHITE_MASK) {
             if (delta == 16) {
                 game->b_en_passant_square = from + 8;
             }
-        }
-        else {
-            if (delta == -16) {
-                game->w_en_passant_square = from - 8;
-            }
-        }
-    }
-
-    // en passant attacking
-    if (is_pawn(game->board[from])) {
-        if (move & MOVE_WHITE_MASK) {
             if (game->w_en_passant_square == to) {
                 game->board[to - 8] = NONE;
             }
         }
         else {
+            if (delta == -16) {
+                game->w_en_passant_square = from - 8;
+            }
             if (game->b_en_passant_square == to) {
                 game->board[to + 8] = NONE;
             }
@@ -330,6 +305,11 @@ Game *load_fen_game(const char *filepath) {
 
     load_fen(filepath, buffer);
 
+    return parse_fen(buffer);
+}
+
+
+Game *parse_fen(const char *buffer) {
     Game *game = create_game();
 
     uint8_t square = 56;
@@ -466,13 +446,15 @@ Game *load_fen_game(const char *filepath) {
         en_passant_file -= 'a';
         en_passant_rank -= '1';
 
-        uint8_t en_passant_target_square = (en_passant_file * 8) + en_passant_rank;
+        uint8_t en_passant_target_square = en_passant_file + (en_passant_rank * 8);
 
+        // the side to move is the one that can capture en passant, so the
+        // target square goes in that color's en passant slot (mirrors move_piece)
         if (!game->move) {
-            game->b_en_passant_square = en_passant_target_square;
+            game->w_en_passant_square = en_passant_target_square;
         }
         else {
-            game->w_en_passant_square = en_passant_target_square;
+            game->b_en_passant_square = en_passant_target_square;
         }
         index++;
     }

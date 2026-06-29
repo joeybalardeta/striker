@@ -41,21 +41,36 @@ void print_move(uint32_t move) {
 }
 
 
-uint32_t get_time_us() {
+uint64_t get_time_us() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    return (tv.tv_sec * 1000000) + tv.tv_usec;
+    return ((uint64_t) tv.tv_sec * 1000000ULL) + (uint64_t) tv.tv_usec;
 }
 
 
 // gets thread specific time
-uint32_t get_time_ns() {
+uint64_t get_time_ns() {
     struct timespec ts;
 
     if (clock_gettime(CLOCK_TYPE, &ts) == 0) {
-        return (ts.tv_sec * 1000000000) + ts.tv_nsec;
+        return ((uint64_t) ts.tv_sec * 1000000000ULL) + (uint64_t) ts.tv_nsec;
     } else {
         return 0;
+    }
+}
+
+
+// prints an elapsed nanosecond duration using the largest unit that keeps
+// the value >= 1 (microseconds -> milliseconds -> seconds)
+void print_elapsed_time(uint64_t elapsed_ns) {
+    if (elapsed_ns < 1000000ULL) {              // under 1 ms
+        printf("%.2fus", elapsed_ns / 1000.0);
+    }
+    else if (elapsed_ns < 1000000000ULL) {      // under 1 s
+        printf("%.2fms", elapsed_ns / 1000000.0);
+    }
+    else {
+        printf("%.2fs", elapsed_ns / 1000000000.0);
     }
 }

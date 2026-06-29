@@ -53,5 +53,6 @@ void print_board(Game *game);
 void print_board_reverse(Game *game);
 
 Game *load_fen_game(const char *filepath);
+Game *parse_fen(const char *fen);
 
 #endif

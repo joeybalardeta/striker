@@ -13,6 +13,9 @@
 
 // major move validator functions
 uint8_t is_legal_move(Game *game, uint32_t move);
+uint8_t is_pseudo_legal(Game *game, uint32_t move, uint8_t active_player, uint8_t active_color);
+uint8_t move_leaves_king_safe(Game *game, uint32_t move, uint8_t king_sq);
+uint8_t is_square_attacked(Game *game, int8_t kr, int8_t kc, uint32_t attacking_color);
 uint8_t is_in_check(Game *game, uint8_t player);
 uint8_t is_checkmate(Game *game);
 uint8_t is_draw(Game *game);
@@ -35,6 +38,7 @@ uint32_t add_move_flags(Game *game, uint32_t move);
 uint8_t get_king_square(Game *game, uint8_t player);
 uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside);
 uint8_t is_pawn_promotion_move(Game *game, uint32_t move);
+void generate_moves(Game *game, MoveList *possible_moves);
 MoveList *get_possible_moves(Game *game);
 
 #endif

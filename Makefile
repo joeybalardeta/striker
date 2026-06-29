@@ -9,7 +9,7 @@ OBJ=obj/
 # BIN=bin/
 
 CC=gcc
-CFLAGS=-Wall -std=c11
+CFLAGS=-Wall -std=c11 -O3 -march=native -flto
 LFLAGS=-lrt
 COMPILE=$(CC) $(CFLAGS)
 OBJS:=$(patsubst $(SRC)%.c, $(OBJ)%.o, $(wildcard $(SRC)*.c))

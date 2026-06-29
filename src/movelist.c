@@ -10,6 +10,7 @@ MoveList *create_movelist() {
 
     movelist->length = 0;
     movelist->first = NULL;
+    movelist->last = NULL;
 
     return movelist;
 }
@@ -20,94 +21,46 @@ void delete_movelist(MoveList *movelist) {
         return;
     }
 
-    clear_movelist(movelist);
-
+    // entries are inline, so a single free releases the whole list
     free(movelist);
 }
 
 
 MoveListEntry *get_movelistentry(MoveList *movelist, uint32_t index) {
-    uint32_t length = movelist->length;
-
-    if (index >= length) {
+    if (index >= movelist->length) {
         return NULL;
     }
 
-    MoveListEntry *movelistentry = movelist->first;
-
-    for (uint32_t i = 0; i < index; i++) {
-        movelistentry = movelistentry->next;
-    }
-
-    return movelistentry;
+    // entries are contiguous: direct O(1) indexing
+    return &movelist->entries[index];
 }
 
 
-void add_movelistentry(MoveList *movelist, MoveListEntry *movelistentry) {
-    if (!movelistentry) {
-        return;
+void add_move(MoveList *movelist, uint32_t move) {
+    if (movelist->length >= MOVELIST_CAPACITY) {
+        return;  // cannot happen in legal chess; guards against overflow
     }
 
+    MoveListEntry *entry = &movelist->entries[movelist->length];
+    entry->move = move;
+    entry->next = NULL;
+
     if (movelist->length == 0) {
-        movelist->first = movelistentry;
+        movelist->first = entry;
     }
     else {
-        MoveListEntry *last = get_movelistentry(movelist, movelist->length - 1);
-        last->next = movelistentry;
+        movelist->last->next = entry;
     }
+    movelist->last = entry;
 
     movelist->length++;
 }
 
 
-void add_move(MoveList *movelist, uint32_t move) {
-    add_movelistentry(movelist, create_movelistentry(move));
-}
-
-
-void remove_movelistentry(MoveList *movelist, uint32_t index) {
-    if (movelist->length == 0) {
-        return;
-    }
-
-    MoveListEntry *prev = get_movelistentry(movelist, index - 1);
-    MoveListEntry *to_remove = get_movelistentry(movelist, index);
-
-    if (prev) {
-        prev->next = NULL;
-    }
-    else {
-        movelist->first = movelist->first->next;
-    }
-
-    movelist->length--;
-
-    delete_movelistentry(to_remove);
-}
-
-
 void clear_movelist(MoveList *movelist) {
-    while (movelist->first) {
-        remove_movelistentry(movelist, 0);
-    }
-}
-
-// movelistentry functions
-MoveListEntry *create_movelistentry(uint32_t move) {
-    MoveListEntry *movelistentry = (MoveListEntry *) malloc(sizeof(MoveListEntry));
-
-    movelistentry->move = move;
-    movelistentry->next = NULL;
-
-    return movelistentry;
-}
-
-
-void delete_movelistentry(MoveListEntry *movelistentry) {
-    if (!movelistentry) {
-        return;
-    }
-    free(movelistentry);
+    movelist->first = NULL;
+    movelist->last = NULL;
+    movelist->length = 0;
 }
 
 

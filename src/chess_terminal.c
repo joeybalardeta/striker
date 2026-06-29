@@ -78,32 +78,11 @@ void execute_option(uint32_t option) {
             printf("Enter max depth: ");
             uint32_t max_depth = get_user_option();
 
-            printf("Running PERFT test:\n\n");
-
-            for (int i = 0; i <= max_depth; i++) {
-                uint32_t start_time, end_time, elapsed_time;
-                double elapsed_time_formatted;
-                
-                start_time = get_time_ns();
-                uint32_t moves = perft(game, i);
-                end_time = get_time_ns();
-
-                elapsed_time = end_time - start_time;
-                elapsed_time_formatted = ((double) elapsed_time / 1000000);
-            
-                if (i < 3) {
-                    printf("Depth %d: %9u moves found | %.2fms\n", i, moves, elapsed_time_formatted);
-                }
-                else {
-                    elapsed_time_formatted /= 1000;
-                    printf("Depth %d: %9u moves found | %.2fs\n", i, moves, elapsed_time_formatted);
-                }
-            }
-            printf("\nPERFT test done.\n");
+            run_perft_test(game, max_depth);
 
             delete_game(game);
             break;
-        
+
         }
 
         case 5:	{           // perft move generation (with FEN)
@@ -116,28 +95,7 @@ void execute_option(uint32_t option) {
             printf("Enter max depth: ");
             uint32_t max_depth = get_user_option();
 
-            printf("Running PERFT test:\n\n");
-
-            for (int i = 1; i <= max_depth; i++) {
-                uint32_t start_time, end_time, elapsed_time;
-                double elapsed_time_formatted;
-                
-                start_time = get_time_ns();
-                uint32_t moves = perft(game, i);
-                end_time = get_time_ns();
-
-                elapsed_time = end_time - start_time;
-                elapsed_time_formatted = ((double) elapsed_time / 1000000);
-            
-                if (i < 3) {
-                    printf("Depth %d: %9u moves found | %.2fms\n", i, moves, elapsed_time_formatted);
-                }
-                else {
-                    elapsed_time_formatted /= 1000;
-                    printf("Depth %d: %9u moves found | %.2fs\n", i, moves, elapsed_time_formatted);
-                }
-            }
-            printf("\nPERFT test done.\n");
+            run_perft_test(game, max_depth);
 
             delete_game(game);
             break;
