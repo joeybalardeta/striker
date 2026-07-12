@@ -29,7 +29,7 @@ uint32_t get_computer_move(Game *game, uint8_t player) {
 
     srand(time(NULL)); 
 
-    uint32_t move = get_movelistentry(possible_moves, rand() % possible_moves->length)->move;
+    uint32_t move = possible_moves->moves[rand() % possible_moves->length];
 
     delete_movelist(possible_moves);
 
@@ -213,25 +213,23 @@ uint32_t perft(Game *game, int8_t depth) {
 
     uint32_t total_moves = 0;
 
-    MoveListEntry* mle = possible_moves.first;
-    for (int i = 0; i < possible_moves.length; i++) {
+    for (uint32_t i = 0; i < possible_moves.length; i++) {
+        uint32_t move = possible_moves.moves[i];
         // stack copy avoids a malloc/free per node in the perft tree
         Game clone;
         memcpy(&clone, game, sizeof(Game));
-        move_piece(&clone, mle->move);
+        move_piece(&clone, move);
         change_turn(&clone);
         uint32_t moves = perft(&clone, depth - 1);
 
         #ifdef DEBUG_PERFT
         if (depth == max_depth) {
             // perft divide: "<from><to>: <count>" e.g. e2e4: 9329
-            print_square(mle->move & 0xFF);
-            print_square((mle->move >> 8) & 0xFF);
+            print_square(move & 0xFF);
+            print_square((move >> 8) & 0xFF);
             printf(": %u\n", moves);
         }
         #endif
-
-        mle = mle->next;
 
         total_moves += moves;
     }
@@ -250,13 +248,11 @@ static int move_cmp(const void *a, const void *b) {
 
 // copies a move list's moves into 'out' and sorts them, returning the count
 static int collect_sorted(MoveList *list, uint32_t *out) {
-    MoveListEntry *e = list->first;
     int n = (int) list->length;
     int i;
 
     for (i = 0; i < n; i++) {
-        out[i] = e->move;
-        e = e->next;
+        out[i] = list->moves[i];
     }
     qsort(out, n, sizeof(uint32_t), move_cmp);
     return n;
@@ -287,7 +283,6 @@ static int crosscheck_node(Game *game, int depth, uint32_t *path, int ply) {
     int na, nb;                         // move counts
     int mismatch;                       // set when the two disagree
     int i;                              // loop index
-    MoveListEntry *e;                   // child iterator
     char fen[128];                      // FEN of a mismatching node
 
     generate_moves(game, &bb);
@@ -326,17 +321,15 @@ static int crosscheck_node(Game *game, int depth, uint32_t *path, int ply) {
     }
 
     // both agree here; descend using the (identical) bitboard move list
-    e = bb.first;
     for (i = 0; i < (int) bb.length; i++) {
         Game clone;
         memcpy(&clone, game, sizeof(Game));
-        move_piece(&clone, e->move);
+        move_piece(&clone, bb.moves[i]);
         change_turn(&clone);
-        path[ply] = e->move;
+        path[ply] = bb.moves[i];
         if (crosscheck_node(&clone, depth - 1, path, ply + 1)) {
             return 1;
         }
-        e = e->next;
     }
     return 0;
 } /* crosscheck_node */

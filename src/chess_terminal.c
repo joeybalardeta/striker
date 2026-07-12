@@ -275,7 +275,6 @@ uint32_t get_valid_user_move(Game *game) {
     MoveList legal;         // legal moves for the current position
     uint16_t raw;           // the user's from/to input
     uint8_t from, to;       // decoded squares
-    MoveListEntry *e;       // iterator over the legal list
     uint32_t chosen;        // the matched legal move
     int i;                  // loop index
     int found;              // whether a legal match was found
@@ -291,16 +290,15 @@ uint32_t get_valid_user_move(Game *game) {
         // scan for a legal move with the same from/to squares
         chosen = 0;
         found = 0;
-        e = legal.first;
         for (i = 0; i < (int) legal.length; i++) {
-            if ((e->move & 0xFF) == from && ((e->move >> 8) & 0xFF) == to) {
+            uint32_t m = legal.moves[i];
+            if ((m & 0xFF) == from && ((m >> 8) & 0xFF) == to) {
                 // prefer the queen promotion among same-square candidates
-                if (!found || (e->move & MOVE_QP_FLAG_MASK)) {
-                    chosen = e->move;
+                if (!found || (m & MOVE_QP_FLAG_MASK)) {
+                    chosen = m;
                 }
                 found = 1;
             }
-            e = e->next;
         }
 
         if (found) {
