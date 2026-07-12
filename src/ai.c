@@ -7,9 +7,12 @@
 #include "game.h"
 #include "player.h"
 #include "piece.h"
-#include "rules.h"
+#include "movegen.h"
 #include "movelist.h"
 #include "utils.h"
+
+// the archived mailbox generator, kept as a reference oracle for --crosscheck
+void generate_moves_mailbox(Game *game, MoveList *possible_moves);
 
 // debug define macros (enables compilation of printf statements)
 // #define DEBUG_AI
@@ -235,3 +238,110 @@ uint32_t perft(Game *game, int8_t depth) {
 
     return total_moves;
 }
+
+
+// orders two moves so a move list can be compared as a set
+static int move_cmp(const void *a, const void *b) {
+    uint32_t x = *(const uint32_t *) a;
+    uint32_t y = *(const uint32_t *) b;
+    return (x > y) - (x < y);
+} /* move_cmp */
+
+
+// copies a move list's moves into 'out' and sorts them, returning the count
+static int collect_sorted(MoveList *list, uint32_t *out) {
+    MoveListEntry *e = list->first;
+    int n = (int) list->length;
+    int i;
+
+    for (i = 0; i < n; i++) {
+        out[i] = e->move;
+        e = e->next;
+    }
+    qsort(out, n, sizeof(uint32_t), move_cmp);
+    return n;
+} /* collect_sorted */
+
+
+// prints a sorted move array as space-separated "<from><to>" coordinates
+static void print_move_array(uint32_t *moves, int n) {
+    int i;
+
+    for (i = 0; i < n; i++) {
+        print_square(moves[i] & 0xFF);
+        print_square((moves[i] >> 8) & 0xFF);
+        printf(" ");
+    }
+    printf("\n");
+} /* print_move_array */
+
+
+// Compares the bitboard and mailbox generators at this node and, if they agree,
+// recurses into every child to 'depth'. Returns 1 on the first divergence,
+// printing the offending position's FEN and both move lists.
+static int crosscheck_node(Game *game, int depth) {
+    MoveList bb;                        // bitboard generator output
+    MoveList mb;                        // mailbox oracle output
+    uint32_t a[MOVELIST_CAPACITY];      // sorted bitboard moves
+    uint32_t b[MOVELIST_CAPACITY];      // sorted mailbox moves
+    int na, nb;                         // move counts
+    int mismatch;                       // set when the two disagree
+    int i;                              // loop index
+    MoveListEntry *e;                   // child iterator
+    char fen[128];                      // FEN of a mismatching node
+
+    generate_moves(game, &bb);
+    generate_moves_mailbox(game, &mb);
+
+    na = collect_sorted(&bb, a);
+    nb = collect_sorted(&mb, b);
+
+    // compare the two sorted move sets
+    mismatch = (na != nb);
+    for (i = 0; i < na && !mismatch; i++) {
+        if (a[i] != b[i]) {
+            mismatch = 1;
+        }
+    }
+
+    if (mismatch) {
+        game_to_fen(game, fen);
+        printf("MISMATCH: %s\n", fen);
+        printf("  bitboard (%d): ", na);
+        print_move_array(a, na);
+        printf("  mailbox  (%d): ", nb);
+        print_move_array(b, nb);
+        return 1;
+    }
+
+    if (depth <= 1) {
+        return 0;
+    }
+
+    // both agree here; descend using the (identical) bitboard move list
+    e = bb.first;
+    for (i = 0; i < (int) bb.length; i++) {
+        Game clone;
+        memcpy(&clone, game, sizeof(Game));
+        move_piece(&clone, e->move);
+        change_turn(&clone);
+        if (crosscheck_node(&clone, depth - 1)) {
+            return 1;
+        }
+        e = e->next;
+    }
+    return 0;
+} /* crosscheck_node */
+
+
+int run_crosscheck(Game *game, int depth) {
+    printf("Running crosscheck (bitboard vs mailbox) to depth %d:\n\n", depth);
+
+    if (crosscheck_node(game, depth)) {
+        printf("\nCrosscheck FAILED: generators disagree (see mismatch above).\n");
+        return 1;
+    }
+
+    printf("Crosscheck passed: generators agree at every node to depth %d.\n", depth);
+    return 0;
+} /* run_crosscheck */

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include "rules.h"
+#include "rules_mailbox.h"
 #include "move.h"
 #include "movelist.h"
 #include "game.h"
@@ -74,7 +74,7 @@ uint8_t move_leaves_king_safe(Game *game, uint32_t move, uint8_t king_sq) {
         Game clone;
         memcpy(&clone, game, sizeof(Game));
         move_piece(&clone, move);
-        return !is_in_check(&clone, active_player);
+        return !mb_is_in_check(&clone, active_player);
     }
 
     uint8_t moving = game->board[from];
@@ -212,7 +212,7 @@ uint8_t is_square_attacked(Game *game, int8_t kr, int8_t kc, uint32_t attacking_
 }
 
 
-uint8_t is_in_check(Game *game, uint8_t player) {
+uint8_t mb_is_in_check(Game *game, uint8_t player) {
     uint32_t attacking_color = player == PLAYERW ? BLACK : WHITE;
 
     uint8_t king_idx = get_king_square(game, player);
@@ -224,29 +224,29 @@ uint8_t is_in_check(Game *game, uint8_t player) {
 }
 
 
-uint8_t is_checkmate(Game *game) {
+uint8_t mb_is_checkmate(Game *game) {
     uint8_t player = !game->move ? PLAYERW : PLAYERB;
 
-    MoveList *possible_moves = get_possible_moves(game);
+    MoveList *possible_moves = mb_get_possible_moves(game);
     uint16_t moves = possible_moves->length;
     delete_movelist(possible_moves);
 
-    if (moves == 0 && is_in_check(game, player)) {
+    if (moves == 0 && mb_is_in_check(game, player)) {
         return CHECKMATE;
     }
     return 0;
 }
 
 
-uint8_t is_draw(Game *game) {
+uint8_t mb_is_draw(Game *game) {
     uint8_t player = !game->move ? PLAYERW : PLAYERB;
 
-    MoveList *possible_moves = get_possible_moves(game);
+    MoveList *possible_moves = mb_get_possible_moves(game);
     uint16_t moves = possible_moves->length;
     delete_movelist(possible_moves);
 
     // stalemate
-    if (moves == 0 && is_in_check(game, player)) {
+    if (moves == 0 && mb_is_in_check(game, player)) {
         return STALEMATE;
     }
 
@@ -817,7 +817,7 @@ uint8_t can_castle(Game *game, uint8_t player, uint8_t queenside) {
     }
     
     // check if player is in check
-    if (is_in_check(game, player)) {
+    if (mb_is_in_check(game, player)) {
         #ifdef DEBUG_CASTLING
         printf("Cannot castle, king in check.\n");
         #endif
@@ -1064,7 +1064,7 @@ static uint8_t compute_king_context(Game *game, uint8_t king_sq, uint32_t own_co
 
 // fills a caller-provided list, so hot callers (perft/search) can use a
 // stack-allocated MoveList and avoid a heap allocation per node
-void generate_moves(Game *game, MoveList *possible_moves) {
+void generate_moves_mailbox(Game *game, MoveList *possible_moves) {
     clear_movelist(possible_moves);
 
     uint8_t player = !game->move ? PLAYERW : PLAYERB;
@@ -1176,8 +1176,8 @@ void generate_moves(Game *game, MoveList *possible_moves) {
 }
 
 
-MoveList *get_possible_moves(Game *game) {
+MoveList *mb_get_possible_moves(Game *game) {
     MoveList *possible_moves = create_movelist();
-    generate_moves(game, possible_moves);
+    generate_moves_mailbox(game, possible_moves);
     return possible_moves;
 }

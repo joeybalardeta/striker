@@ -2,6 +2,7 @@
 #define GAMEH
 
 #include <stdint.h>
+#include "bitboard.h"
 
 #define BOARD_SIZE 64
 
@@ -11,6 +12,16 @@ typedef struct {
     uint8_t player_b;
 
     uint8_t board[BOARD_SIZE];
+
+    /* Bitboard representation, kept in sync with the mailbox 'board' above and
+     * used as the source of truth for move generation. pieces is indexed
+     * [color][piece type], where color is BB_WHITE/BB_BLACK and piece type is
+     * the PAWN..KING enum value (index 0 is unused). occ holds per-color
+     * occupancy; occ_all is both colors combined.
+     */
+    Bitboard pieces[2][7];
+    Bitboard occ[2];
+    Bitboard occ_all;
 
     // game info bit map
     // bit 0 - move (0 = white, 1 = black)
@@ -47,6 +58,7 @@ void set_player_w(Game *game, uint8_t player_w);
 void set_player_b(Game *game, uint8_t player_b);
 void print_all_square_values(Game *game);
 void set_default_board(Game *game);
+void rebuild_bitboards(Game *game);
 void move_piece(Game *game, uint32_t move);
 void modify_castling_rights(Game *game, uint32_t move);
 void print_board(Game *game);
@@ -54,5 +66,6 @@ void print_board_reverse(Game *game);
 
 Game *load_fen_game(const char *filepath);
 Game *parse_fen(const char *fen);
+void game_to_fen(Game *game, char *buffer);
 
 #endif

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "chess_terminal.h"
 #include "game.h"
+#include "bitboard.h"
 #include "ai.h"
 
 #define VERSION "0.0.1"
@@ -11,13 +12,19 @@ int main(int argc, char **argv) {
     printf("Striker Chess Engine\n");
     printf("Version: %s\n\n", VERSION);
 
+    // build the bitboard attack tables before any move generation happens
+    init_attack_tables();
+
     // command line modes:
     //   --validate            run move generation validation suite
+    //   --bench               run the throughput benchmark
+    //   --crosscheck [depth]  diff the bitboard and mailbox generators
     //   --perft <depth> [--fen <fen>]
     int perft_depth = -1;
     const char *fen = NULL;
     int validate = 0;
     int bench = 0;
+    int crosscheck = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--validate") == 0) {
@@ -25,6 +32,9 @@ int main(int argc, char **argv) {
         }
         else if (strcmp(argv[i], "--bench") == 0) {
             bench = 1;
+        }
+        else if (strcmp(argv[i], "--crosscheck") == 0) {
+            crosscheck = 1;
         }
         else if (strcmp(argv[i], "--perft") == 0 && i + 1 < argc) {
             perft_depth = atoi(argv[++i]);
@@ -42,6 +52,26 @@ int main(int argc, char **argv) {
     if (bench) {
         run_benchmark();
         return 0;
+    }
+
+    if (crosscheck) {
+        Game *game;
+        if (fen != NULL) {
+            game = parse_fen(fen);
+        }
+        else {
+            game = create_game();
+            set_default_board(game);
+        }
+
+        print_board(game);
+        printf("\n");
+
+        // reuse --perft's depth if given, otherwise a sensible default
+        int result = run_crosscheck(game, perft_depth >= 0 ? perft_depth : 4);
+
+        delete_game(game);
+        return result;
     }
 
     if (perft_depth >= 0) {

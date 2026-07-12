@@ -17,7 +17,7 @@ Game *create_game() {
     game->player_w = USER;
     game->player_b = USER;
     game->move = 0;
-    
+
     game->castle_kingside_w = 1;
     game->castle_queenside_w = 1;
     game->castle_kingside_b = 1;
@@ -33,8 +33,83 @@ Game *create_game() {
         game->board[i] = NONE;
     }
 
+    // start with empty, consistent bitboards (board is all NONE)
+    rebuild_bitboards(game);
+
     return game;
 }
+
+
+// Derives all bitboards (per-piece, per-color occupancy, and combined
+// occupancy) from the mailbox board. Used after board setup / FEN parsing so
+// the two representations always start in agreement.
+void rebuild_bitboards(Game *game) {
+    int color;      // color index while zeroing
+    int type;       // piece type index while zeroing
+    int sq;         // square being scanned
+    uint8_t piece;  // piece code on the square
+    Bitboard bit;   // that square's bit
+
+    // clear every bitboard first
+    for (color = 0; color < 2; color++) {
+        game->occ[color] = 0;
+        for (type = 0; type < 7; type++) {
+            game->pieces[color][type] = 0;
+        }
+    }
+    game->occ_all = 0;
+
+    // set one bit per occupied square, indexed by the piece's color and type
+    for (sq = 0; sq < BOARD_SIZE; sq++) {
+        piece = game->board[sq];
+        if (piece != NONE) {
+            color = (piece & BLACK) ? BB_BLACK : BB_WHITE;
+            type = PIECE_MASK(piece);
+            bit = BB_SQ(sq);
+            game->pieces[color][type] |= bit;
+            game->occ[color] |= bit;
+            game->occ_all |= bit;
+        }
+    }
+} /* rebuild_bitboards */
+
+
+// Removes whatever piece sits on 'sq' from both the mailbox and the bitboards.
+// A no-op on an empty square.
+static void square_clear(Game *game, uint8_t sq) {
+    uint8_t piece;  // piece currently on the square
+    int color;      // its color index
+    int type;       // its piece type
+    Bitboard bit;   // its bit
+
+    piece = game->board[sq];
+    if (piece != NONE) {
+        color = (piece & BLACK) ? BB_BLACK : BB_WHITE;
+        type = PIECE_MASK(piece);
+        bit = BB_SQ(sq);
+        game->pieces[color][type] &= ~bit;
+        game->occ[color] &= ~bit;
+        game->occ_all &= ~bit;
+        game->board[sq] = NONE;
+    }
+} /* square_clear */
+
+
+// Places 'piece' on 'sq' in both the mailbox and the bitboards. Assumes the
+// square has already been cleared.
+static void square_set(Game *game, uint8_t sq, uint8_t piece) {
+    int color;      // color index of the piece
+    int type;       // its piece type
+    Bitboard bit;   // its bit
+
+    color = (piece & BLACK) ? BB_BLACK : BB_WHITE;
+    type = PIECE_MASK(piece);
+    bit = BB_SQ(sq);
+    game->pieces[color][type] |= bit;
+    game->occ[color] |= bit;
+    game->occ_all |= bit;
+    game->board[sq] = piece;
+} /* square_set */
 
 
 Game *clone_game(Game *game) {
@@ -102,13 +177,23 @@ void set_default_board(Game *game) {
     game->board[61] = BLACK | BISHOP;
     game->board[62] = BLACK | KNIGHT;
     game->board[63] = BLACK | ROOK;
+
+    // track kings and derive the bitboards from the freshly filled mailbox
+    game->king_square_w = 4;
+    game->king_square_b = 60;
+    rebuild_bitboards(game);
 }
 
 
 void move_piece(Game *game, uint32_t move) {
     uint8_t from = move & 0xFF;
     uint8_t to = (move >> 8) & 0xFF;
-    
+    uint8_t piece = game->board[from];              // the moving piece
+    uint32_t piece_color = (move & MOVE_WHITE_MASK) ? WHITE : BLACK;
+    uint8_t rook;                                   // relocated rook when castling
+    uint8_t landing = piece;                        // piece that ends up on 'to'
+
+    // the side that just moved clears the opponent's stale en passant target
     if (move & MOVE_WHITE_MASK) {
         game->b_en_passant_square = 0xFF;
     }
@@ -116,15 +201,15 @@ void move_piece(Game *game, uint32_t move) {
         game->w_en_passant_square = 0xFF;
     }
 
-    // en passant targeting and attacking (single pawn check for both)
-    if (is_pawn(game->board[from])) {
+    // en passant targeting (double push) and attacking (single pawn check for both)
+    if (is_pawn(piece)) {
         int8_t delta = to - from;
         if (move & MOVE_WHITE_MASK) {
             if (delta == 16) {
                 game->b_en_passant_square = from + 8;
             }
             if (game->w_en_passant_square == to) {
-                game->board[to - 8] = NONE;
+                square_clear(game, to - 8);         // captured black pawn
             }
         }
         else {
@@ -132,41 +217,42 @@ void move_piece(Game *game, uint32_t move) {
                 game->w_en_passant_square = from - 8;
             }
             if (game->b_en_passant_square == to) {
-                game->board[to + 8] = NONE;
+                square_clear(game, to + 8);         // captured white pawn
             }
         }
     }
 
-    // castling moves
-    if (is_king(game->board[from]) && (move & MOVE_KSC_FLAG_MASK)) {
-        game->board[from + 1] = game->board[from + 3];
-        game->board[from + 3] = NONE;
+    // castling relocates the rook; the king itself is moved by the block below
+    if (is_king(piece) && (move & MOVE_KSC_FLAG_MASK)) {
+        rook = game->board[from + 3];
+        square_clear(game, from + 3);
+        square_set(game, from + 1, rook);
     }
-    else if (is_king(game->board[from]) && (move & MOVE_QSC_FLAG_MASK)) {
-        game->board[from - 1] = game->board[from - 4];
-        game->board[from - 4] = NONE;
+    else if (is_king(piece) && (move & MOVE_QSC_FLAG_MASK)) {
+        rook = game->board[from - 4];
+        square_clear(game, from - 4);
+        square_set(game, from - 1, rook);
     }
 
+    // castling rights depend on the moving piece still sitting on 'from'
     modify_castling_rights(game, move);
 
-
-    // pawn promotion handling
-    uint32_t piece_color = (move & MOVE_WHITE_MASK ) ? WHITE : BLACK;
+    // pawn promotion: choose the piece that lands on 'to'
     if (move & MOVE_NP_FLAG_MASK) {
-        game->board[from] = piece_color | KNIGHT;
+        landing = piece_color | KNIGHT;
     }
     else if (move & MOVE_BP_FLAG_MASK) {
-        game->board[from] = piece_color | BISHOP;
+        landing = piece_color | BISHOP;
     }
     else if (move & MOVE_RP_FLAG_MASK) {
-        game->board[from] = piece_color | ROOK;
+        landing = piece_color | ROOK;
     }
     else if (move & MOVE_QP_FLAG_MASK) {
-        game->board[from] = piece_color | QUEEN;
+        landing = piece_color | QUEEN;
     }
 
-    // updates to king location
-    if (is_king(game->board[from])) {
+    // track the king's square for fast check tests
+    if (is_king(piece)) {
         if (move & MOVE_WHITE_MASK) {
             game->king_square_w = to;
         }
@@ -175,11 +261,10 @@ void move_piece(Game *game, uint32_t move) {
         }
     }
 
-
-    // end changes
-    game->board[to] = game->board[from];
-
-    game->board[from] = NONE;
+    // apply the move: remove any captured piece, lift the mover, drop it on 'to'
+    square_clear(game, to);
+    square_clear(game, from);
+    square_set(game, to, landing);
 }
 
 
@@ -466,6 +551,94 @@ Game *parse_fen(const char *buffer) {
     index++;
     uint16_t full_moves_count = buffer[index];
 
+    // derive the bitboards from the mailbox we just parsed
+    rebuild_bitboards(game);
+
     return game;
 
 }
+
+
+// Serializes the game position into a FEN string in 'buffer'. Only the fields
+// the engine tracks are emitted; halfmove/fullmove counters are written as
+// "0 1". Used to report positions (e.g. from --crosscheck) for the python-chess
+// oracle in tools/.
+void game_to_fen(Game *game, char *buffer) {
+    int idx;        // write cursor into buffer
+    int rank;       // rank being written (8 down to 1)
+    int file;       // file within the rank
+    int empty;      // run length of empty squares
+    uint8_t piece;  // piece on the current square
+    char c;         // its FEN letter
+    int any;        // whether any castling right is present
+    uint8_t ep;     // en passant target square for the side to move
+
+    idx = 0;
+
+    // piece placement, rank 8 first
+    for (rank = 7; rank >= 0; rank--) {
+        empty = 0;
+        for (file = 0; file < 8; file++) {
+            piece = game->board[rank * 8 + file];
+            if (piece == NONE) {
+                empty++;
+                continue;
+            }
+            if (empty) {
+                buffer[idx++] = '0' + empty;
+                empty = 0;
+            }
+            switch (PIECE_MASK(piece)) {
+                case PAWN:   c = 'p'; break;
+                case KNIGHT: c = 'n'; break;
+                case BISHOP: c = 'b'; break;
+                case ROOK:   c = 'r'; break;
+                case QUEEN:  c = 'q'; break;
+                default:     c = 'k'; break;
+            }
+            if (piece & WHITE) {
+                c = c - 'a' + 'A';      // white pieces are uppercase
+            }
+            buffer[idx++] = c;
+        }
+        if (empty) {
+            buffer[idx++] = '0' + empty;
+        }
+        if (rank) {
+            buffer[idx++] = '/';
+        }
+    }
+
+    // side to move
+    buffer[idx++] = ' ';
+    buffer[idx++] = game->move ? 'b' : 'w';
+
+    // castling rights
+    buffer[idx++] = ' ';
+    any = 0;
+    if (game->castle_kingside_w)  { buffer[idx++] = 'K'; any = 1; }
+    if (game->castle_queenside_w) { buffer[idx++] = 'Q'; any = 1; }
+    if (game->castle_kingside_b)  { buffer[idx++] = 'k'; any = 1; }
+    if (game->castle_queenside_b) { buffer[idx++] = 'q'; any = 1; }
+    if (!any) {
+        buffer[idx++] = '-';
+    }
+
+    // en passant target square (the side to move's capture square)
+    buffer[idx++] = ' ';
+    ep = game->move ? game->b_en_passant_square : game->w_en_passant_square;
+    if (ep <= 63) {
+        buffer[idx++] = 'a' + (ep % 8);
+        buffer[idx++] = '1' + (ep / 8);
+    }
+    else {
+        buffer[idx++] = '-';
+    }
+
+    // halfmove / fullmove counters (not tracked; placeholders)
+    buffer[idx++] = ' ';
+    buffer[idx++] = '0';
+    buffer[idx++] = ' ';
+    buffer[idx++] = '1';
+    buffer[idx] = '\0';
+} /* game_to_fen */

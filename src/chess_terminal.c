@@ -7,7 +7,7 @@
 #include "io.h"
 #include "ai.h"
 #include "movelist.h"
-#include "rules.h"
+#include "movegen.h"
 #include "move.h"
 #include "utils.h"
 
@@ -182,7 +182,8 @@ void game_loop(Game *game) {
     // handling the game's end condition
     switch (game_state) {
         case CHECKMATE:
-            printf("Checkmate! %s wins!\n", !game->move ? "White" : "Black");
+            // after change_turn the side to move is the checkmated loser
+            printf("Checkmate! %s wins!\n", game->move ? "White" : "Black");
             break;
         
         case STALEMATE:
@@ -244,11 +245,11 @@ uint8_t game_tick(Game *game) {
     printf("\n");
     #endif
 
-    // make move
+    // make move, then hand the turn to the opponent
     move_piece(game, move);
+    change_turn(game);
 
-
-    // check game state (returns for loop exiting)
+    // check whether the side now to move is checkmated / drawn
     uint8_t ischeckmate = is_checkmate(game);
     uint8_t isdraw = is_draw(game);
     if (ischeckmate) {
@@ -262,27 +263,52 @@ uint8_t game_tick(Game *game) {
         return isdraw;
     }
 
-    // set up for next iteration
-    change_turn(game);
-    
     // return 0 (game continues)
     return 0;
 }
 
+// Prompts until the user enters a legal move. Validity is decided by membership
+// in the generated legal move list (which already carries the correct flags),
+// so no separate move-validation layer is needed. When several legal moves
+// share the from/to squares (a promotion), the queen promotion is chosen.
 uint32_t get_valid_user_move(Game *game) {
-    printf("Enter move: ");
-    uint32_t move = (uint32_t) get_user_move();
-    move = add_move_flags(game, move);
+    MoveList legal;         // legal moves for the current position
+    uint16_t raw;           // the user's from/to input
+    uint8_t from, to;       // decoded squares
+    MoveListEntry *e;       // iterator over the legal list
+    uint32_t chosen;        // the matched legal move
+    int i;                  // loop index
+    int found;              // whether a legal match was found
 
-    while (!is_legal_move(game, move)) {
-        printf("Invalid move!\n");
+    while (1) {
         printf("Enter move: ");
-        move = (uint32_t) get_user_move();
-    }
+        raw = get_user_move();
+        from = raw & 0xFF;
+        to = (raw >> 8) & 0xFF;
 
-    // printf("Move: 0x%x\n", move);
-    return move;
-}
+        generate_moves(game, &legal);
+
+        // scan for a legal move with the same from/to squares
+        chosen = 0;
+        found = 0;
+        e = legal.first;
+        for (i = 0; i < (int) legal.length; i++) {
+            if ((e->move & 0xFF) == from && ((e->move >> 8) & 0xFF) == to) {
+                // prefer the queen promotion among same-square candidates
+                if (!found || (e->move & MOVE_QP_FLAG_MASK)) {
+                    chosen = e->move;
+                }
+                found = 1;
+            }
+            e = e->next;
+        }
+
+        if (found) {
+            return chosen;
+        }
+        printf("Invalid move!\n");
+    }
+} /* get_valid_user_move */
 
 
 void dump_game_info(Game *game) {

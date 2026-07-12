@@ -11,5 +11,6 @@ uint32_t perft(Game *game, int8_t depth);
 void run_perft_test(Game *game, uint32_t max_depth);
 int run_validation();
 void run_benchmark();
+int run_crosscheck(Game *game, int depth);
 
 #endif
