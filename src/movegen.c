@@ -113,12 +113,27 @@ static void add_promotions(MoveList *list, int from, int to, uint32_t color_flag
 } /* add_promotions */
 
 
-/* Generates pawn pushes, captures, promotions and en passant. */
-static void gen_pawns(Game *game, MoveList *list, int us, int them,
-                      int king_sq, uint32_t color_flag) {
+/* Returns a pinned piece's allowed movement ray (the full line through the king
+ * and the piece), or all-ones when the piece is not pinned. A pinned piece may
+ * only move along this line.
+ */
+static inline Bitboard pin_ray(int king_sq, int from, Bitboard pinned) {
+    return (pinned & BB_SQ(from)) ? line_bb[king_sq][from] : ~(Bitboard) 0;
+} /* pin_ray */
+
+
+/* Generates pawn pushes, captures, promotions and en passant. Non-en-passant
+ * moves are masked by 'check_mask' (block/capture squares when in check) and,
+ * for a pinned pawn, its pin ray -- so no per-move king-safety test is needed.
+ * En passant is rare and full of edge cases, so it is validated with the exact
+ * move_is_legal recompute instead.
+ */
+static void gen_pawns(Game *game, MoveList *list, int us, int them, int king_sq,
+                      uint32_t color_flag, Bitboard check_mask, Bitboard pinned) {
     Bitboard pawns;     // remaining pawns to process
     Bitboard occ;       // full occupancy
     Bitboard caps;      // capture destinations for one pawn
+    Bitboard ray;       // this pawn's pin ray (all-ones if unpinned)
     int forward;        // index delta for a one-square push
     int start_rank;     // rank from which a double push is allowed
     int promo_rank;     // rank on which a pawn promotes
@@ -137,45 +152,41 @@ static void gen_pawns(Game *game, MoveList *list, int us, int them,
     while (pawns) {
         from = bb_pop_lsb(&pawns);
         rank = from / 8;
+        ray = pin_ray(king_sq, from, pinned);
 
-        // forward push onto an empty square (with promotion / double push)
+        // forward push onto an empty square
         to = from + forward;
         if (!(occ & BB_SQ(to))) {
-            if (to / 8 == promo_rank) {
-                if (move_is_legal(game, from, to, PAWN, us, them, king_sq, 0)) {
+            if (BB_SQ(to) & check_mask & ray) {
+                if (to / 8 == promo_rank) {
                     add_promotions(list, from, to, color_flag);
                 }
-            }
-            else {
-                if (move_is_legal(game, from, to, PAWN, us, them, king_sq, 0)) {
+                else {
                     add_move(list, mk(from, to, color_flag));
                 }
-                // double push from the starting rank if both squares are empty
-                if (rank == start_rank) {
-                    to2 = from + 2 * forward;
-                    if (!(occ & BB_SQ(to2))
-                        && move_is_legal(game, from, to2, PAWN, us, them, king_sq, 0)) {
-                        add_move(list, mk(from, to2, color_flag));
-                    }
+            }
+            // double push (intermediate square already known empty)
+            if (rank == start_rank) {
+                to2 = from + 2 * forward;
+                if (!(occ & BB_SQ(to2)) && (BB_SQ(to2) & check_mask & ray)) {
+                    add_move(list, mk(from, to2, color_flag));
                 }
             }
         }
 
         // diagonal captures onto enemy-occupied squares
-        caps = pawn_attacks[us][from] & game->occ[them];
+        caps = pawn_attacks[us][from] & game->occ[them] & check_mask & ray;
         while (caps) {
             to = bb_pop_lsb(&caps);
             if (to / 8 == promo_rank) {
-                if (move_is_legal(game, from, to, PAWN, us, them, king_sq, 0)) {
-                    add_promotions(list, from, to, color_flag);
-                }
+                add_promotions(list, from, to, color_flag);
             }
-            else if (move_is_legal(game, from, to, PAWN, us, them, king_sq, 0)) {
+            else {
                 add_move(list, mk(from, to, color_flag));
             }
         }
 
-        // en passant capture onto the target square
+        // en passant capture onto the target square (fully validated)
         if (ep_sq <= 63 && (pawn_attacks[us][from] & BB_SQ(ep_sq))) {
             if (move_is_legal(game, from, ep_sq, PAWN, us, them, king_sq, 1)) {
                 add_move(list, mk(from, ep_sq, color_flag));
@@ -185,66 +196,88 @@ static void gen_pawns(Game *game, MoveList *list, int us, int them,
 } /* gen_pawns */
 
 
-/* Generates moves for a set of leaper/slider pieces sharing an attack function.
- * 'attacks' is the destination set for one piece; this helper is called per
- * piece type with that set already computed.
- */
-static void gen_piece_moves(Game *game, MoveList *list, int from, Bitboard attacks,
-                            int piece_type, int us, int them, int king_sq,
-                            uint32_t color_flag) {
+/* Emits every destination in 'targets' as a move from 'from'. */
+static void emit_targets(MoveList *list, int from, Bitboard targets,
+                         uint32_t color_flag) {
     int to;
 
-    attacks &= ~game->occ[us];      // cannot land on our own pieces
-    while (attacks) {
-        to = bb_pop_lsb(&attacks);
-        if (move_is_legal(game, from, to, piece_type, us, them, king_sq, 0)) {
-            add_move(list, mk(from, to, color_flag));
-        }
+    while (targets) {
+        to = bb_pop_lsb(&targets);
+        add_move(list, mk(from, to, color_flag));
     }
-} /* gen_piece_moves */
+} /* emit_targets */
 
 
-/* Generates knight, bishop, rook, queen and (non-castling) king moves. */
-static void gen_pieces(Game *game, MoveList *list, int us, int them,
-                       int king_sq, uint32_t color_flag) {
-    Bitboard occ;   // full occupancy for slider lookups
-    Bitboard bb;    // pieces of one type left to process
-    int from;       // source square
+/* Generates knight, bishop, rook and queen moves. Destinations are restricted
+ * to 'check_mask' (block/capture the checker when in single check) and, for a
+ * pinned piece, its pin ray. With those masks applied no per-move king-safety
+ * test is required. A pinned knight can never move and is skipped.
+ */
+static void gen_pieces(Game *game, MoveList *list, int us, int them, int king_sq,
+                       uint32_t color_flag, Bitboard check_mask, Bitboard pinned) {
+    Bitboard occ;       // full occupancy for slider lookups
+    Bitboard own;       // our pieces (cannot be captured)
+    Bitboard bb;        // pieces of one type left to process
+    Bitboard targets;   // legal destinations for one piece
+    int from;           // source square
 
     occ = game->occ_all;
+    own = game->occ[us];
 
-    bb = game->pieces[us][KNIGHT];
+    // knights (pinned knights excluded: a knight can never stay on the pin line)
+    bb = game->pieces[us][KNIGHT] & ~pinned;
     while (bb) {
         from = bb_pop_lsb(&bb);
-        gen_piece_moves(game, list, from, knight_attacks[from],
-                        KNIGHT, us, them, king_sq, color_flag);
+        targets = knight_attacks[from] & ~own & check_mask;
+        emit_targets(list, from, targets, color_flag);
     }
 
+    // bishops
     bb = game->pieces[us][BISHOP];
     while (bb) {
         from = bb_pop_lsb(&bb);
-        gen_piece_moves(game, list, from, bishop_attacks(from, occ),
-                        BISHOP, us, them, king_sq, color_flag);
+        targets = bishop_attacks(from, occ) & ~own & check_mask
+                  & pin_ray(king_sq, from, pinned);
+        emit_targets(list, from, targets, color_flag);
     }
 
+    // rooks
     bb = game->pieces[us][ROOK];
     while (bb) {
         from = bb_pop_lsb(&bb);
-        gen_piece_moves(game, list, from, rook_attacks(from, occ),
-                        ROOK, us, them, king_sq, color_flag);
+        targets = rook_attacks(from, occ) & ~own & check_mask
+                  & pin_ray(king_sq, from, pinned);
+        emit_targets(list, from, targets, color_flag);
     }
 
+    // queens
     bb = game->pieces[us][QUEEN];
     while (bb) {
         from = bb_pop_lsb(&bb);
-        gen_piece_moves(game, list, from, queen_attacks(from, occ),
-                        QUEEN, us, them, king_sq, color_flag);
+        targets = queen_attacks(from, occ) & ~own & check_mask
+                  & pin_ray(king_sq, from, pinned);
+        emit_targets(list, from, targets, color_flag);
     }
-
-    // the (single) king's step moves; castling is handled separately
-    gen_piece_moves(game, list, king_sq, king_attacks[king_sq],
-                    KING, us, them, king_sq, color_flag);
 } /* gen_pieces */
+
+
+/* Generates the king's (non-castling) step moves. The king relocates, so each
+ * destination is validated with move_is_legal, which recomputes attacks with the
+ * king removed from occupancy (so it cannot step along a slider's check ray).
+ */
+static void gen_king(Game *game, MoveList *list, int us, int them, int king_sq,
+                     uint32_t color_flag) {
+    Bitboard targets;   // candidate king destinations
+    int to;
+
+    targets = king_attacks[king_sq] & ~game->occ[us];
+    while (targets) {
+        to = bb_pop_lsb(&targets);
+        if (move_is_legal(game, king_sq, to, KING, us, them, king_sq, 0)) {
+            add_move(list, mk(king_sq, to, color_flag));
+        }
+    }
+} /* gen_king */
 
 
 /* Generates the two castling moves when legal: correct rights, an empty path,
@@ -254,12 +287,9 @@ static void gen_castles(Game *game, MoveList *list, int us, int them,
                         int king_sq, uint32_t color_flag) {
     Bitboard occ;   // full occupancy
 
+    // caller only invokes this when the king is not in check
+    (void) king_sq;
     occ = game->occ_all;
-
-    // may not castle while in check
-    if (square_attacked(game, king_sq, them)) {
-        return;
-    }
 
     if (us == BB_WHITE) {
         // kingside: f1,g1 empty and unattacked
@@ -301,6 +331,18 @@ void generate_moves(Game *game, MoveList *out) {
     int them;               // opposing color index
     uint32_t color_flag;    // MOVE_WHITE_MASK / MOVE_BLACK_MASK for this side
     int king_sq;            // our king square
+    Bitboard occ;           // full occupancy
+    Bitboard own;           // our pieces
+    Bitboard bishopsQ;      // enemy bishops + queens (diagonal sliders)
+    Bitboard rooksQ;        // enemy rooks + queens (orthogonal sliders)
+    Bitboard checkers;      // enemy pieces giving check
+    Bitboard check_mask;    // squares a non-king piece may move to
+    Bitboard pinned;        // our pinned pieces
+    Bitboard snipers;       // enemy sliders aligned with the king
+    int nc;                 // number of checkers
+    int csq;                // the checking square (single check)
+    int s;                  // a sniper square
+    Bitboard blockers;      // pieces between king and a sniper
 
     clear_movelist(out);
 
@@ -314,9 +356,55 @@ void generate_moves(Game *game, MoveList *out) {
     }
     king_sq = bb_lsb(game->pieces[us][KING]);
 
-    gen_pawns(game, out, us, them, king_sq, color_flag);
-    gen_pieces(game, out, us, them, king_sq, color_flag);
-    gen_castles(game, out, us, them, king_sq, color_flag);
+    occ = game->occ_all;
+    own = game->occ[us];
+    bishopsQ = game->pieces[them][BISHOP] | game->pieces[them][QUEEN];
+    rooksQ   = game->pieces[them][ROOK]   | game->pieces[them][QUEEN];
+
+    // pieces currently giving check to our king
+    checkers = (pawn_attacks[us][king_sq] & game->pieces[them][PAWN])
+             | (knight_attacks[king_sq] & game->pieces[them][KNIGHT])
+             | (bishop_attacks(king_sq, occ) & bishopsQ)
+             | (rook_attacks(king_sq, occ) & rooksQ);
+    nc = bb_popcount(checkers);
+
+    // squares a non-king piece may move to: everywhere if not in check, else the
+    // block-or-capture squares for a single checker, and nothing in double check
+    if (nc == 0) {
+        check_mask = ~(Bitboard) 0;
+    }
+    else if (nc == 1) {
+        csq = bb_lsb(checkers);
+        check_mask = between_bb[king_sq][csq] | checkers;
+    }
+    else {
+        check_mask = 0;
+    }
+
+    // pinned pieces: our piece is the sole blocker between the king and an
+    // aligned enemy slider
+    pinned = 0;
+    snipers = (rook_attacks(king_sq, 0) & rooksQ)
+            | (bishop_attacks(king_sq, 0) & bishopsQ);
+    while (snipers) {
+        s = bb_pop_lsb(&snipers);
+        blockers = between_bb[king_sq][s] & occ;
+        if (blockers && (blockers & (blockers - 1)) == 0 && (blockers & own)) {
+            pinned |= blockers;
+        }
+    }
+
+    // in double check only the king may move; otherwise generate everything
+    if (nc < 2) {
+        gen_pawns(game, out, us, them, king_sq, color_flag, check_mask, pinned);
+        gen_pieces(game, out, us, them, king_sq, color_flag, check_mask, pinned);
+    }
+    gen_king(game, out, us, them, king_sq, color_flag);
+
+    // castling is only possible when not in check
+    if (nc == 0) {
+        gen_castles(game, out, us, them, king_sq, color_flag);
+    }
 } /* generate_moves */
 
 

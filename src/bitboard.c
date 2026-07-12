@@ -16,6 +16,8 @@
 Bitboard knight_attacks[64];
 Bitboard king_attacks[64];
 Bitboard pawn_attacks[2][64];
+Bitboard between_bb[64][64];
+Bitboard line_bb[64][64];
 
 /* Per-square magic entry for one sliding piece kind. 'attacks' points into the
  * shared backing table below; index = ((occ & mask) * magic) >> shift.
@@ -286,6 +288,59 @@ static void init_pawn_attacks(void) {
 } /* init_pawn_attacks */
 
 
+/* Fills between_bb and line_bb for every pair of squares. */
+static void init_between_line(void) {
+    int a, b;           /* the two squares of the pair */
+    int ra, fa, rb, fb; /* their ranks and files */
+    int dr, df;         /* unit step from a toward b */
+    int r, f;           /* running square while walking */
+
+    for (a = 0; a < 64; a++) {
+        for (b = 0; b < 64; b++) {
+            between_bb[a][b] = 0;
+            line_bb[a][b] = 0;
+
+            if (a == b) {
+                continue;
+            }
+
+            ra = a / 8; fa = a % 8;
+            rb = b / 8; fb = b % 8;
+
+            /* only rank / file / diagonal pairs are aligned */
+            if (!(ra == rb || fa == fb || (ra - rb == fa - fb) || (ra - rb == fb - fa))) {
+                continue;
+            }
+
+            dr = (rb > ra) - (rb < ra);
+            df = (fb > fa) - (fb < fa);
+
+            /* squares strictly between a and b */
+            r = ra + dr;
+            f = fa + df;
+            while (r != rb || f != fb) {
+                between_bb[a][b] |= BB_SQ(r * 8 + f);
+                r += dr;
+                f += df;
+            }
+
+            /* full line: walk both ways to the board edge, include a and b */
+            line_bb[a][b] = BB_SQ(a) | BB_SQ(b);
+            r = ra + dr; f = fa + df;
+            while (r >= 0 && r <= 7 && f >= 0 && f <= 7) {
+                line_bb[a][b] |= BB_SQ(r * 8 + f);
+                r += dr; f += df;
+            }
+            r = ra - dr; f = fa - df;
+            while (r >= 0 && r <= 7 && f >= 0 && f <= 7) {
+                line_bb[a][b] |= BB_SQ(r * 8 + f);
+                r -= dr; f -= df;
+            }
+        }
+    }
+} /* init_between_line */
+
+
 void init_attack_tables(void) {
     int sq;
     int rook_off;       /* running offset into rook_attack_data */
@@ -293,6 +348,7 @@ void init_attack_tables(void) {
 
     init_leaper_attacks();
     init_pawn_attacks();
+    init_between_line();
 
     /* lay each square's magic table end to end in the shared backing arrays */
     rook_off = 0;

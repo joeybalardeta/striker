@@ -24,6 +24,17 @@ extern Bitboard knight_attacks[64];
 extern Bitboard king_attacks[64];
 extern Bitboard pawn_attacks[2][64];
 
+/* Geometry tables for the legal move generator, indexed [a][b]:
+ *   between_bb[a][b] - squares strictly between a and b when they share a rank,
+ *                      file or diagonal (empty otherwise). Used for check-block
+ *                      masks and pin detection.
+ *   line_bb[a][b]    - every square on the full board line through a and b when
+ *                      aligned (empty otherwise). Used as a pinned piece's
+ *                      allowed movement ray.
+ */
+extern Bitboard between_bb[64][64];
+extern Bitboard line_bb[64][64];
+
 /* Returns the number of set bits (pieces) in a bitboard. */
 static inline int bb_popcount(Bitboard b) {
     return __builtin_popcountll(b);

@@ -279,7 +279,7 @@ static void print_move_array(uint32_t *moves, int n) {
 // Compares the bitboard and mailbox generators at this node and, if they agree,
 // recurses into every child to 'depth'. Returns 1 on the first divergence,
 // printing the offending position's FEN and both move lists.
-static int crosscheck_node(Game *game, int depth) {
+static int crosscheck_node(Game *game, int depth, uint32_t *path, int ply) {
     MoveList bb;                        // bitboard generator output
     MoveList mb;                        // mailbox oracle output
     uint32_t a[MOVELIST_CAPACITY];      // sorted bitboard moves
@@ -305,6 +305,13 @@ static int crosscheck_node(Game *game, int depth) {
     }
 
     if (mismatch) {
+        printf("PATH: ");
+        for (i = 0; i < ply; i++) {
+            print_square(path[i] & 0xFF);
+            print_square((path[i] >> 8) & 0xFF);
+            printf(" ");
+        }
+        printf("\n");
         game_to_fen(game, fen);
         printf("MISMATCH: %s\n", fen);
         printf("  bitboard (%d): ", na);
@@ -325,7 +332,8 @@ static int crosscheck_node(Game *game, int depth) {
         memcpy(&clone, game, sizeof(Game));
         move_piece(&clone, e->move);
         change_turn(&clone);
-        if (crosscheck_node(&clone, depth - 1)) {
+        path[ply] = e->move;
+        if (crosscheck_node(&clone, depth - 1, path, ply + 1)) {
             return 1;
         }
         e = e->next;
@@ -335,9 +343,11 @@ static int crosscheck_node(Game *game, int depth) {
 
 
 int run_crosscheck(Game *game, int depth) {
+    uint32_t path[64];
+
     printf("Running crosscheck (bitboard vs mailbox) to depth %d:\n\n", depth);
 
-    if (crosscheck_node(game, depth)) {
+    if (crosscheck_node(game, depth, path, 0)) {
         printf("\nCrosscheck FAILED: generators disagree (see mismatch above).\n");
         return 1;
     }
